@@ -271,8 +271,8 @@ HRESULT InitDXGraphics()
 		g_D3DPP[i].BackBufferHeight				= g_screens[i].cy;
 		g_D3DPP[i].BackBufferFormat				= g_formatFull;
 		g_D3DPP[i].BackBufferCount				= 1;
-		g_D3DPP[i].MultiSampleType				= D3DMULTISAMPLE_NONE;
-//		g_D3DPP[i].MultiSampleType				= D3DMULTISAMPLE_4_SAMPLES;
+//		g_D3DPP[i].MultiSampleType				= D3DMULTISAMPLE_NONE;
+		g_D3DPP[i].MultiSampleType				= D3DMULTISAMPLE_4_SAMPLES;
 		g_D3DPP[i].MultiSampleQuality			= 0;
 		g_D3DPP[i].hDeviceWindow				= g_hWindow[i];
 		g_D3DPP[i].SwapEffect					= D3DSWAPEFFECT_DISCARD;
