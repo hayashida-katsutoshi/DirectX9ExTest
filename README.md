@@ -12,3 +12,14 @@
     |Option|Value|
     |---|---|
     |Working Directory|$(TargetDir)|
+
+## Command Line Options
+|Option|Value|Note|
+|--primary|<width>x<height>|Specify Primary Display Resolution|
+|--secondary|<width>x<height>|Specify Secondary Display Resolution|
+|--msaa|none|Enable MSAA|
+
+### e.g.
+```
+DirectX9ExTest.exe --primary 2160x3840 --secondary 1920x1080 --msaa
+```

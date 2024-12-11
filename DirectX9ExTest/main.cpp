@@ -27,6 +27,8 @@
 #pragma comment( lib, "dxerr.lib" )
 #pragma comment( lib, "dxguid.lib" )
 
+#define STR_BUF_SIZE	256
+
 /*-------------------------------------------
 	Global variables(Application)
 --------------------------------------------*/
@@ -41,6 +43,8 @@ std::vector<SIZE> g_screens;
 D3DFORMAT	g_formatFull	= D3DFMT_X8R8G8B8;		// Back buffer format
 
 bool		g_bActive		= false;
+
+D3DMULTISAMPLE_TYPE g_multiSampleType = D3DMULTISAMPLE_NONE;
 
 /*-------------------------------------------
 	Global variables(DirectX)
@@ -69,6 +73,178 @@ HRESULT ERR_MSGBOX(const WCHAR* str, HRESULT hr)
 
 --------------------------------------------*/
 LRESULT CALLBACK MainWndProc(HWND hWnd,UINT msg,UINT wParam,LONG lParam);
+
+/*-------------------------------------------
+
+--------------------------------------------*/
+std::string WStringToString(std::wstring oWString)
+{
+	int iBufferSize = WideCharToMultiByte(CP_OEMCP, 0, oWString.c_str(), -1, (char*)NULL, 0, NULL, NULL);
+
+	CHAR* cpMultiByte = new CHAR[iBufferSize];
+
+	WideCharToMultiByte(CP_OEMCP, 0, oWString.c_str(), -1, cpMultiByte, iBufferSize, NULL, NULL);
+
+	std::string oRet(cpMultiByte, cpMultiByte + iBufferSize - 1);
+
+	delete[] cpMultiByte;
+
+	return(oRet);
+}
+
+std::vector<std::string> split(const std::string& s, char delim)
+{
+	std::vector<std::string> elems;
+	std::stringstream ss(s);
+	std::string item;
+	while (getline(ss, item, delim)) {
+		if (!item.empty()) {
+			elems.push_back(item);
+		}
+	}
+	return elems;
+}
+
+void SetCommandLineArgs()
+{
+	int argc;
+	LPWSTR* argv = CommandLineToArgvW(GetCommandLineW(), &argc);
+
+	int primaryWidth = 0, primaryHeight = 0;
+	int secondaryWidth = 0, secondaryHeight = 0;
+	for (int i = 0; i < argc; i++)
+	{
+		std::string opt = WStringToString(argv[i]);
+		if (opt.compare("--primary") == 0)
+		{
+			std::string val = WStringToString(argv[i + 1]);
+			std::vector<std::string> params = split(val, 'x');
+
+			if (g_screens.size() > 0)
+			{
+				SIZE resolution;
+				resolution.cx = stoi(params[0]);
+				resolution.cy = stoi(params[1]);
+				g_screens[0] = resolution;
+			}
+		}
+		else if (opt.compare("--secondary") == 0)
+		{
+			std::string val = WStringToString(argv[i + 1]);
+			std::vector<std::string> params = split(val, 'x');
+
+			if (g_screens.size() > 1)
+			{
+				SIZE resolution;
+				resolution.cx = stoi(params[0]);
+				resolution.cy = stoi(params[1]);
+				g_screens[1] = resolution;
+			}
+		}
+		else if (opt.compare("--msaa") == 0)
+		{
+			g_multiSampleType = D3DMULTISAMPLE_4_SAMPLES;
+		}
+	}
+}
+
+/*-------------------------------------------
+
+--------------------------------------------*/
+bool GetDisplaySettings(DEVMODE& mode, std::wstring deviceName, int x, int y, int w, int h)
+{
+	EnumDisplaySettings(deviceName.c_str(), ENUM_CURRENT_SETTINGS, &mode);
+
+	if ((mode.dmPosition.x == x) &&
+		(mode.dmPosition.y == y) &&
+		(mode.dmPelsWidth == static_cast<DWORD>(w)) &&
+		(mode.dmPelsHeight == static_cast<DWORD>(h)))
+	{
+		return false;
+	}
+
+
+	mode.dmFields = DM_PELSWIDTH | DM_PELSHEIGHT | DM_POSITION;
+	mode.dmPelsWidth = static_cast<DWORD>(w);
+	mode.dmPelsHeight = static_cast<DWORD>(h);
+	mode.dmPosition.x = x;
+	mode.dmPosition.y = y;
+
+	switch (mode.dmDisplayOrientation)
+	{
+	case DMDO_DEFAULT:
+	case DMDO_180:
+		if (mode.dmPelsWidth < mode.dmPelsHeight)
+		{
+			mode.dmDisplayOrientation = DMDO_90;
+			mode.dmFields |= DM_DISPLAYORIENTATION;
+		}
+		break;
+	case DMDO_90:
+	case DMDO_270:
+		if (mode.dmPelsWidth > mode.dmPelsHeight)
+		{
+			mode.dmDisplayOrientation = DMDO_DEFAULT;
+			mode.dmFields |= DM_DISPLAYORIENTATION;
+		}
+		break;
+	}
+
+	return true;
+}
+
+LONG ChangeDisplayResolution(std::wstring deviceName, int x, int y, int w, int h, bool test)
+{
+	LONG lStatus = DISP_CHANGE_SUCCESSFUL;
+
+	DEVMODE	mode;
+	if (GetDisplaySettings(mode, deviceName, x, y, w, h))
+	{
+		DWORD dwflags = test ? CDS_TEST : CDS_UPDATEREGISTRY;
+		lStatus = ChangeDisplaySettingsEx(deviceName.c_str(), &mode, NULL, dwflags, NULL);
+	}
+
+	return lStatus;
+}
+
+HRESULT ChangeDisplayResolution()
+{
+	DISPLAY_DEVICE dd;
+	ZeroMemory(&dd, sizeof(dd));
+	dd.cb = sizeof(dd);
+	for (int i = 0; EnumDisplayDevices(NULL, i, &dd, 0); i++)
+	{
+		if (i >= g_screens.size())
+			break;
+
+		DEVMODE devmode;
+		ZeroMemory(&devmode, sizeof(devmode));
+		BOOL ret = EnumDisplaySettings(dd.DeviceName, ENUM_CURRENT_SETTINGS, &devmode);
+		if (ret)
+		{
+			int width = g_screens[i].cx;
+			int height = g_screens[i].cy;
+			LONG test = ChangeDisplayResolution(dd.DeviceName, devmode.dmPosition.x, devmode.dmPosition.y, width, height, true);
+			if (test == DISP_CHANGE_SUCCESSFUL)
+			{
+				test = ChangeDisplayResolution(dd.DeviceName, devmode.dmPosition.x, devmode.dmPosition.y, width, height, false);
+				if (test != DISP_CHANGE_SUCCESSFUL)
+				{
+					wchar_t stringBuf[STR_BUF_SIZE];
+					swprintf(stringBuf, STR_BUF_SIZE, L"Change display resolution failed.\n%s : width=%d height=%d", dd.DeviceName, width, height);
+					return ERR_MSGBOX(stringBuf, S_FALSE);
+				}
+			}
+			else
+			{
+				wchar_t stringBuf[STR_BUF_SIZE];
+				swprintf(stringBuf, STR_BUF_SIZE, L"Does not change to the display resolution.\n%s : width=%d height=%d", dd.DeviceName, width, height);
+				return ERR_MSGBOX(stringBuf, S_FALSE);
+			}
+		}
+	}
+	return S_OK;
+}
 
 /*-------------------------------------------
 	
@@ -224,6 +400,11 @@ HRESULT InitApp(HINSTANCE hInst)
 
 	EnumDisplayMonitors(NULL, NULL, MonitorEnumProc, 0);
 
+	SetCommandLineArgs();
+
+	if (ChangeDisplayResolution() != S_OK)
+		return ERR_MSGBOX(L"[InitApp] ChangeDisplayResolution failed.", S_FALSE);
+
 	// Create main window.
 	g_hWindow.resize(g_screens.size());
 	for(int i = 0; i < g_hWindow.size(); i++ )
@@ -271,8 +452,7 @@ HRESULT InitDXGraphics()
 		g_D3DPP[i].BackBufferHeight				= g_screens[i].cy;
 		g_D3DPP[i].BackBufferFormat				= g_formatFull;
 		g_D3DPP[i].BackBufferCount				= 1;
-		g_D3DPP[i].MultiSampleType				= D3DMULTISAMPLE_NONE;
-//		g_D3DPP[i].MultiSampleType				= D3DMULTISAMPLE_4_SAMPLES;
+		g_D3DPP[i].MultiSampleType				= g_multiSampleType;
 		g_D3DPP[i].MultiSampleQuality			= 0;
 		g_D3DPP[i].hDeviceWindow				= g_hWindow[i];
 		g_D3DPP[i].SwapEffect					= D3DSWAPEFFECT_DISCARD;
