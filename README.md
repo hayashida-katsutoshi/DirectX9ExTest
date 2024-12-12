@@ -15,11 +15,13 @@
 
 ## Command Line Options
 |Option|Value|Note|
-|--primary|<width>x<height>|Specify Primary Display Resolution|
-|--secondary|<width>x<height>|Specify Secondary Display Resolution|
-|--msaa|none|Enable MSAA|
+|---|---|---|
+|--primary|\<width\>x\<height\>|Specify Primary Display Resolution<br>default(no option): current resolution|
+|--secondary|\<width\>x\<height\>|Specify Secondary Display Resolution<br>default(no option): current resolution|
+|--msaa|none|Enable MSAA<br>default(no option): disabled|
 
-### e.g.
-```
-DirectX9ExTest.exe --primary 2160x3840 --secondary 1920x1080 --msaa
-```
+## Command Line Usage Example
+  - Primary: 2160x3840, Secondary: 1920x1080, MSAA enabled
+    ```
+    DirectX9ExTest.exe --primary 2160x3840 --secondary 1920x1080 --msaa
+    ```
