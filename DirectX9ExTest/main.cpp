@@ -68,11 +68,25 @@ LPD3DXSPRITE			g_pD3DXSprite = NULL;		// Sprite
 LPDIRECT3DTEXTURE9		g_pD3DTexture = NULL;		// Texture for sprite.
 WCHAR g_szSpriteFile[] = L".\\data\\canvas.dds";	// Location of texture data.
 
-HRESULT ERR_MSGBOX(const WCHAR* str, HRESULT hr)
-{
-	DXTrace(__FILE__, (DWORD)__LINE__, hr, str, TRUE);
-	exit(1);
-	return hr;
+/*-------------------------------------------
+
+--------------------------------------------*/
+HRESULT CleanupD3DObject(void);
+bool CleanupDXGraphics(void);
+bool CleanupApp(void);
+
+#define Exception(str, hr)	\
+{	\
+	CleanupD3DObject();	\
+	CleanupDXGraphics();	\
+	for (int i = 0; i < g_hWindow.size(); i++)	\
+	{	\
+		ShowWindow(g_hWindow[i], SW_HIDE);	\
+		UpdateWindow(g_hWindow[i]);	\
+	}	\
+	DXTrace(__FILE__, (DWORD)__LINE__, hr, str, TRUE);	\
+	CleanupApp();	\
+	exit(1);	\
 }
 
 /*-------------------------------------------
@@ -233,14 +247,14 @@ HRESULT ChangeDisplayResolution()
 				{
 					wchar_t stringBuf[STR_BUF_SIZE];
 					swprintf(stringBuf, STR_BUF_SIZE, L"Change display resolution failed.\n%s : width=%d height=%d", display.monitor.szDevice, width, height);
-					return ERR_MSGBOX(stringBuf, S_FALSE);
+					Exception(stringBuf, S_FALSE);
 				}
 			}
 			else
 			{
 				wchar_t stringBuf[STR_BUF_SIZE];
 				swprintf(stringBuf, STR_BUF_SIZE, L"Does not change to the display resolution.\n%s : width=%d height=%d", display.monitor.szDevice, width, height);
-				return ERR_MSGBOX(stringBuf, S_FALSE);
+				Exception(stringBuf, S_FALSE);
 			}
 		}
 	}
@@ -256,10 +270,10 @@ static int FindAdapter()
 
 	IDirect3D9Ex* dd = 0;
 	if (FAILED(hr = Direct3DCreate9Ex(D3D_SDK_VERSION, &dd)))
-		return ERR_MSGBOX(L"[FindAdapter] Direct3DCreate9 failed.", hr);
+		Exception(L"[FindAdapter] Direct3DCreate9 failed.", hr);
 
 	if (dd == NULL)
-		return ERR_MSGBOX(L"[FindAdapter] Direct3DCreate9 D3D=NULL.", hr);
+		Exception(L"[FindAdapter] Direct3DCreate9 D3D=NULL.", hr);
 
 	Direct3DCreate9Ex( D3D_SDK_VERSION, &dd );
 
@@ -383,7 +397,9 @@ BOOL CALLBACK MonitorEnumProc(HMONITOR hMonitor, HDC hdcMonitor, LPRECT lprcMoni
 	}
 	if (info == 0)
 	{
-		return FALSE;
+		wchar_t stringBuf[STR_BUF_SIZE];
+		swprintf(stringBuf, STR_BUF_SIZE, L"[MonitorEnumProc] Display %s is not found", monitorInfo.szDevice);
+		Exception(stringBuf, S_FALSE);
 	}
 
 	info->size.cx = monitorInfo.rcMonitor.right - monitorInfo.rcMonitor.left;
@@ -439,14 +455,14 @@ HRESULT InitApp(HINSTANCE hInst)
 	wc.lpszClassName	= g_szWndClass;
 
 	if (!RegisterClass(&wc))
-		return ERR_MSGBOX(L"[InitApp] RegisterClass failed.", GetLastError());
+		Exception(L"[InitApp] RegisterClass failed.", GetLastError());
 
 	CreateDisplayInfo();
 
 	SetCommandLineArgs();
 
 	if (ChangeDisplayResolution() != S_OK)
-		return ERR_MSGBOX(L"[InitApp] ChangeDisplayResolution failed.", S_FALSE);
+		Exception(L"[InitApp] ChangeDisplayResolution failed.", S_FALSE);
 
 	// Create main window.
 	g_hWindow.resize(g_screens.size());
@@ -457,7 +473,7 @@ HRESULT InitApp(HINSTANCE hInst)
 				0, 0, g_screens[i].size.cx, g_screens[i].size.cy,
 				NULL, NULL, hInst, NULL);
 		if (g_hWindow[i] == NULL)
-			return ERR_MSGBOX(L"[InitApp] g_hWindow == NULL.", GetLastError());
+			Exception(L"[InitApp] g_hWindow == NULL.", GetLastError());
 
 		ShowWindow(g_hWindow[i], SW_SHOWNORMAL);
 		UpdateWindow(g_hWindow[i]);
@@ -473,10 +489,10 @@ HRESULT InitDXGraphics()
 {
 	HRESULT hr = E_FAIL;
 	if (FAILED(hr = Direct3DCreate9Ex(D3D_SDK_VERSION, &g_pD3D)))
-		return ERR_MSGBOX(L"[InitDXGraphics] Direct3DCreate9 failed.", hr);
+		Exception(L"[InitDXGraphics] Direct3DCreate9 failed.", hr);
 
 	if (g_pD3D == NULL)
-		return ERR_MSGBOX(L"[InitDXGraphics] Direct3DCreate9 D3D=NULL.", hr);
+		Exception(L"[InitDXGraphics] Direct3DCreate9 D3D=NULL.", hr);
 
 	D3DPRESENT_PARAMETERS val = { 0 };
 	g_D3DPP.resize(g_screens.size(), val);
@@ -530,7 +546,7 @@ HRESULT InitDXGraphics()
 		if (FAILED(hr))
 		{
 			free(dm);
-			return ERR_MSGBOX(L"[InitDXGraphics] CreateDevice failed.", hr);
+			Exception(L"[InitDXGraphics] CreateDevice failed.", hr);
 		}
 	}
 
@@ -549,16 +565,16 @@ HRESULT InitDXGraphics()
 	vp.MaxZ		= 1.0f;
 	hr = g_pD3DDevice->SetViewport(&vp);
 	if (FAILED(hr))
-		return DXTRACE_ERR(L"InitDXGraphics SetViewport", hr);
+		Exception(L"InitDXGraphics SetViewport", hr);
 
 	// Create a sprite.
 	hr = D3DXCreateTextureFromFile(g_pD3DDevice, g_szSpriteFile, &g_pD3DTexture);
 	if (FAILED(hr))
-		return ERR_MSGBOX(L"[InitDXGraphics] D3DXCreateTextureFromFile failed.", hr);
+		Exception(L"[InitDXGraphics] D3DXCreateTextureFromFile failed.", hr);
 
 	hr = D3DXCreateSprite(g_pD3DDevice, &g_pD3DXSprite);
 	if (FAILED(hr))
-		return ERR_MSGBOX(L"[InitDXGraphics] D3DXCreateSprite failed.", hr);
+		Exception(L"[InitDXGraphics] D3DXCreateSprite failed.", hr);
 
 	return S_OK;
 }
@@ -586,7 +602,7 @@ HRESULT Render(void)
 			HRESULT hr = g_pD3DDevice->GetSwapChain(i, &pChain);
 			if (FAILED(hr))
 			{
-				ERR_MSGBOX(L"GetSwapChain() failed.", hr);
+				Exception(L"GetSwapChain() failed.", hr);
 			}
 		}
 		IDirect3DSurface9 *pBackBuffer = NULL;
@@ -594,14 +610,14 @@ HRESULT Render(void)
 			HRESULT hr = pChain->GetBackBuffer(0, D3DBACKBUFFER_TYPE_MONO, &pBackBuffer);
 			if (FAILED(hr))
 			{
-				ERR_MSGBOX(L"GetRenderTarget() failed.", hr);
+				Exception(L"GetRenderTarget() failed.", hr);
 			}
 		}
 
 		HRESULT hr = g_pD3DDevice->SetRenderTarget(0, pBackBuffer);
 		if (FAILED(hr))
 		{
-			ERR_MSGBOX(L"SetRenderTarget() failed.", hr);
+			Exception(L"SetRenderTarget() failed.", hr);
 		}
 
 		// Clear scene.
@@ -658,7 +674,7 @@ HRESULT ChangeWindowSize(void)
 				DestroyWindow(g_hWindow[i]);
 			}
 		}
-		ERR_MSGBOX(L"[ChangeWindowSize] ResetEx() failed.", hr);
+		Exception(L"[ChangeWindowSize] ResetEx() failed.", hr);
 	}
 	hr = InitD3DObject();
 	if (FAILED(hr))
@@ -667,7 +683,7 @@ HRESULT ChangeWindowSize(void)
 		{
 			DestroyWindow(g_hWindow[i]);
 		}
-		ERR_MSGBOX(L"[ChangeWindowSize] InitD3DObject failed.", hr);
+		Exception(L"[ChangeWindowSize] InitD3DObject failed.", hr);
 	}
 
 	// Viewport settings.
@@ -685,7 +701,7 @@ HRESULT ChangeWindowSize(void)
 		{
 			DestroyWindow(g_hWindow[i]);
 		}
-		ERR_MSGBOX(L"[ChangeWindowSize] SetViewport failed.", hr);
+		Exception(L"[ChangeWindowSize] SetViewport failed.", hr);
 	}
 	return hr;
 }
@@ -710,6 +726,12 @@ bool CleanupDXGraphics(void)
 bool CleanupApp(void)
 {
 	UnregisterClass(g_szWndClass, g_hInstance);
+
+	for (int i = 0; i < g_hWindow.size(); i++)
+	{
+		DestroyWindow(g_hWindow[i]);
+	}
+
 	return true;
 }
 
@@ -793,13 +815,13 @@ bool AppIdle(void)
 				if (hr == D3DERR_DEVICELOST)
 					return true;
 
-				ERR_MSGBOX(L"[AppIdle] ResetEx failed.", hr);
+				Exception(L"[AppIdle] ResetEx failed.", hr);
 				return false;
 			}
 			hr = InitD3DObject();
 			if (FAILED(hr))
 			{
-				ERR_MSGBOX(L"[AppIdle] InitD3DObject failed.", hr);
+				Exception(L"[AppIdle] InitD3DObject failed.", hr);
 				return false;
 			}
 		}
@@ -825,23 +847,20 @@ int WINAPI wWinMain(HINSTANCE hInst, HINSTANCE, LPWSTR, int)
 	HRESULT hr = InitApp(hInst);
 	if (FAILED(hr))
 	{
-		ERR_MSGBOX(L"[WinMain] InitApp failed.", hr);
-		return 0;
+		Exception(L"[WinMain] InitApp failed.", hr);
 	}
 
 	hr = InitDXGraphics();
 	if (FAILED(hr))
-		ERR_MSGBOX(L"[WinMain] InitDXGraphics failed.", hr);
+	{
+		Exception(L"[WinMain] InitDXGraphics failed.", hr);
+	}
 	else
 	{
 		hr = InitD3DObject();
 		if (FAILED(hr))
 		{
-			ERR_MSGBOX(L"[WinMain] InitD3DObject failed.", hr);
-			for(int i = 0; i < g_hWindow.size(); i++ )
-			{
-				DestroyWindow(g_hWindow[i]);
-			}
+			Exception(L"[WinMain] InitD3DObject failed.", hr);
 		}
 	}
 
@@ -857,10 +876,7 @@ int WINAPI wWinMain(HINSTANCE hInst, HINSTANCE, LPWSTR, int)
 		{
 			if (!AppIdle())
 			{
-				for(int i = 0; i < g_hWindow.size(); i++ )
-				{
-					DestroyWindow(g_hWindow[i]);
-				}
+				break;
 			}
 		}
 	} while (msg.message != WM_QUIT);
