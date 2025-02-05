@@ -16,7 +16,7 @@
 ## Command Line Options
 |Option|Value|Note|
 |---|---|---|
-|--primary|\<width\>x\<height\>|Specify Primary Display Resolution<br>default(no option): current resolution|
+|--primary|\<width\>x\<height\>|<b>main display</b><br>Specify Primary Display Resolution<br>default(no option): current resolution|
 |--secondary|\<width\>x\<height\>|Specify Secondary Display Resolution<br>default(no option): current resolution|
 |--msaa|none|Enable MSAA<br>default(no option): disabled|
 
