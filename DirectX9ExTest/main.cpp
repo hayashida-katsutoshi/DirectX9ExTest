@@ -38,7 +38,13 @@ std::vector<HWND>	g_hWindow;
 WCHAR		g_szAppTitle[]	= L"Direct3D 9 Sample01";
 WCHAR		g_szWndClass[]	= L"D3D9S01";
 
-std::vector<SIZE> g_screens;
+typedef struct _DisplayInfo
+{
+	SIZE size;
+	MONITORINFOEX monitor;
+	std::string deviceName;
+}DisplayInfo;
+std::vector<DisplayInfo> g_screens;
 
 D3DFORMAT	g_formatFull	= D3DFMT_X8R8G8B8;		// Back buffer format
 
@@ -125,7 +131,7 @@ void SetCommandLineArgs()
 				SIZE resolution;
 				resolution.cx = stoi(params[0]);
 				resolution.cy = stoi(params[1]);
-				g_screens[0] = resolution;
+				g_screens[0].size = resolution;
 			}
 		}
 		else if (opt.compare("--secondary") == 0)
@@ -138,7 +144,7 @@ void SetCommandLineArgs()
 				SIZE resolution;
 				resolution.cx = stoi(params[0]);
 				resolution.cy = stoi(params[1]);
-				g_screens[1] = resolution;
+				g_screens[1].size = resolution;
 			}
 		}
 		else if (opt.compare("--msaa") == 0)
@@ -209,36 +215,31 @@ LONG ChangeDisplayResolution(std::wstring deviceName, int x, int y, int w, int h
 
 HRESULT ChangeDisplayResolution()
 {
-	DISPLAY_DEVICE dd;
-	ZeroMemory(&dd, sizeof(dd));
-	dd.cb = sizeof(dd);
-	for (int i = 0; EnumDisplayDevices(NULL, i, &dd, 0); i++)
-	{
-		if (i >= g_screens.size())
-			break;
-
+	for(int i = 0; i < g_screens.size(); i++)
+	{ 
 		DEVMODE devmode;
 		ZeroMemory(&devmode, sizeof(devmode));
-		BOOL ret = EnumDisplaySettings(dd.DeviceName, ENUM_CURRENT_SETTINGS, &devmode);
+		DisplayInfo& display = g_screens[i];
+		BOOL ret = EnumDisplaySettings(display.monitor.szDevice, ENUM_CURRENT_SETTINGS, &devmode);
 		if (ret)
 		{
-			int width = g_screens[i].cx;
-			int height = g_screens[i].cy;
-			LONG test = ChangeDisplayResolution(dd.DeviceName, devmode.dmPosition.x, devmode.dmPosition.y, width, height, true);
+			int width = display.size.cx;
+			int height = display.size.cy;
+			LONG test = ChangeDisplayResolution(display.monitor.szDevice, devmode.dmPosition.x, devmode.dmPosition.y, width, height, true);
 			if (test == DISP_CHANGE_SUCCESSFUL)
 			{
-				test = ChangeDisplayResolution(dd.DeviceName, devmode.dmPosition.x, devmode.dmPosition.y, width, height, false);
+				test = ChangeDisplayResolution(display.monitor.szDevice, devmode.dmPosition.x, devmode.dmPosition.y, width, height, false);
 				if (test != DISP_CHANGE_SUCCESSFUL)
 				{
 					wchar_t stringBuf[STR_BUF_SIZE];
-					swprintf(stringBuf, STR_BUF_SIZE, L"Change display resolution failed.\n%s : width=%d height=%d", dd.DeviceName, width, height);
+					swprintf(stringBuf, STR_BUF_SIZE, L"Change display resolution failed.\n%s : width=%d height=%d", display.monitor.szDevice, width, height);
 					return ERR_MSGBOX(stringBuf, S_FALSE);
 				}
 			}
 			else
 			{
 				wchar_t stringBuf[STR_BUF_SIZE];
-				swprintf(stringBuf, STR_BUF_SIZE, L"Does not change to the display resolution.\n%s : width=%d height=%d", dd.DeviceName, width, height);
+				swprintf(stringBuf, STR_BUF_SIZE, L"Does not change to the display resolution.\n%s : width=%d height=%d", display.monitor.szDevice, width, height);
 				return ERR_MSGBOX(stringBuf, S_FALSE);
 			}
 		}
@@ -314,7 +315,7 @@ static D3DXVECTOR3 GetScrollPos(int index, float velocity, LPDIRECT3DTEXTURE9 te
 
 	D3DXVECTOR3 *pos = &sPos[index];
 	pos->x += velocity;
-	if( pos->x > g_screens[index].cx )
+	if( pos->x > g_screens[index].size.cx )
 	{
 		D3DSURFACE_DESC desc;
 		if( tex && SUCCEEDED( tex->GetLevelDesc( 0, &desc ) ) )
@@ -328,7 +329,7 @@ static D3DXVECTOR3 GetScrollPos(int index, float velocity, LPDIRECT3DTEXTURE9 te
 		D3DSURFACE_DESC desc;
 		if( tex && SUCCEEDED( tex->GetLevelDesc( 0, &desc ) ) )
 		{
-			pos->y = (float)(g_screens[index].cy / 2 - desc.Height / 2);
+			pos->y = (float)(g_screens[index].size.cy / 2 - desc.Height / 2);
 		}
 	}
 
@@ -371,14 +372,56 @@ BOOL CALLBACK MonitorEnumProc(HMONITOR hMonitor, HDC hdcMonitor, LPRECT lprcMoni
 	monitorInfo.cbSize = sizeof(monitorInfo);
 	GetMonitorInfo(hMonitor, &monitorInfo);
 
-	SIZE resolution;
-	resolution.cx = monitorInfo.rcMonitor.right - monitorInfo.rcMonitor.left;
-	resolution.cy = monitorInfo.rcMonitor.bottom - monitorInfo.rcMonitor.top;
-	g_screens.push_back(resolution);
+	DisplayInfo* info = 0;
+	for (int i = 0; i < g_screens.size(); i++)
+	{
+		std::string szDevice = WStringToString(monitorInfo.szDevice);
+		if (g_screens[i].deviceName.compare(szDevice) == 0)
+		{
+			info = &g_screens[i];
+		}
+	}
+	if (info == 0)
+	{
+		return FALSE;
+	}
+
+	info->size.cx = monitorInfo.rcMonitor.right - monitorInfo.rcMonitor.left;
+	info->size.cy = monitorInfo.rcMonitor.bottom - monitorInfo.rcMonitor.top;
+	info->monitor = monitorInfo;
 
 	return TRUE;
 }
 
+/*-------------------------------------------
+
+--------------------------------------------*/
+void CreateDisplayInfo()
+{
+	IDirect3D9Ex* dd = 0;
+	Direct3DCreate9Ex(D3D_SDK_VERSION, &dd);
+	UINT count = dd->GetAdapterCount();
+	for (UINT adapter = 0; adapter < count; adapter++)
+	{
+		D3DCAPS9 pCaps;
+		dd->GetDeviceCaps(adapter, D3DDEVTYPE_HAL, &pCaps);
+
+		D3DADAPTER_IDENTIFIER9 id;
+		if (dd->GetAdapterIdentifier(pCaps.AdapterOrdinalInGroup, 0, &id) == D3D_OK)
+		{
+			DisplayInfo info;
+			info.deviceName = id.DeviceName;
+			g_screens.push_back(info);
+		}
+	}
+	dd->Release();
+
+	EnumDisplayMonitors(NULL, NULL, MonitorEnumProc, 0);
+}
+
+/*-------------------------------------------
+
+--------------------------------------------*/
 HRESULT InitApp(HINSTANCE hInst)
 {
 	g_hInstance = hInst;
@@ -398,7 +441,7 @@ HRESULT InitApp(HINSTANCE hInst)
 	if (!RegisterClass(&wc))
 		return ERR_MSGBOX(L"[InitApp] RegisterClass failed.", GetLastError());
 
-	EnumDisplayMonitors(NULL, NULL, MonitorEnumProc, 0);
+	CreateDisplayInfo();
 
 	SetCommandLineArgs();
 
@@ -411,7 +454,7 @@ HRESULT InitApp(HINSTANCE hInst)
 	{
 		g_hWindow[i] = CreateWindow(g_szWndClass, g_szAppTitle,
 				WS_POPUP,
-				0, 0, g_screens[i].cx, g_screens[i].cy,
+				0, 0, g_screens[i].size.cx, g_screens[i].size.cy,
 				NULL, NULL, hInst, NULL);
 		if (g_hWindow[i] == NULL)
 			return ERR_MSGBOX(L"[InitApp] g_hWindow == NULL.", GetLastError());
@@ -448,8 +491,8 @@ HRESULT InitDXGraphics()
 
 	for( int i = 0; i < g_D3DPP.size(); i++ )
 	{
-		g_D3DPP[i].BackBufferWidth				= g_screens[i].cx;
-		g_D3DPP[i].BackBufferHeight				= g_screens[i].cy;
+		g_D3DPP[i].BackBufferWidth				= g_screens[i].size.cx;
+		g_D3DPP[i].BackBufferHeight				= g_screens[i].size.cy;
 		g_D3DPP[i].BackBufferFormat				= g_formatFull;
 		g_D3DPP[i].BackBufferCount				= 1;
 		g_D3DPP[i].MultiSampleType				= g_multiSampleType;
