@@ -52,6 +52,8 @@ bool		g_bActive		= false;
 
 D3DMULTISAMPLE_TYPE g_multiSampleType = D3DMULTISAMPLE_NONE;
 
+bool		g_rotMode = false;
+
 /*-------------------------------------------
 	Global variables(DirectX)
 --------------------------------------------*/
@@ -67,6 +69,7 @@ bool g_bDeviceLost = false;
 LPD3DXSPRITE			g_pD3DXSprite = NULL;		// Sprite
 LPDIRECT3DTEXTURE9		g_pD3DTexture = NULL;		// Texture for sprite.
 WCHAR g_szSpriteFile[] = L".\\data\\canvas.dds";	// Location of texture data.
+WCHAR g_szSpriteRotFile[] = L".\\data\\canvas_rot.dds";
 
 /*-------------------------------------------
 
@@ -164,6 +167,10 @@ void SetCommandLineArgs()
 		else if (opt.compare("--msaa") == 0)
 		{
 			g_multiSampleType = D3DMULTISAMPLE_4_SAMPLES;
+		}
+		else if (opt.compare("--rot") == 0)
+		{
+			g_rotMode = true;
 		}
 	}
 }
@@ -327,23 +334,47 @@ static D3DXVECTOR3 GetScrollPos(int index, float velocity, LPDIRECT3DTEXTURE9 te
 		return D3DXVECTOR3(0.0f,0.0f,1.0f);
 	}
 
-	D3DXVECTOR3 *pos = &sPos[index];
-	pos->x += velocity;
-	if( pos->x > g_screens[index].size.cx )
+	D3DXVECTOR3* pos = &sPos[index];
+	if (g_rotMode)
 	{
-		D3DSURFACE_DESC desc;
-		if( tex && SUCCEEDED( tex->GetLevelDesc( 0, &desc ) ) )
+		pos->y += velocity;
+		if (pos->y > g_screens[index].size.cy)
 		{
-			pos->x = (float)(desc.Width) * -1.0f;
+			D3DSURFACE_DESC desc;
+			if (tex && SUCCEEDED(tex->GetLevelDesc(0, &desc)))
+			{
+				pos->y = (float)(desc.Height) * -1.0f;
+			}
+		}
+
+		if (pos->x == 0)
+		{
+			D3DSURFACE_DESC desc;
+			if (tex && SUCCEEDED(tex->GetLevelDesc(0, &desc)))
+			{
+				pos->x = (float)(g_screens[index].size.cx / 2 - desc.Width / 2);
+			}
 		}
 	}
-
-	if( pos->y == 0 )
+	else
 	{
-		D3DSURFACE_DESC desc;
-		if( tex && SUCCEEDED( tex->GetLevelDesc( 0, &desc ) ) )
+		pos->x += velocity;
+		if (pos->x > g_screens[index].size.cx)
 		{
-			pos->y = (float)(g_screens[index].size.cy / 2 - desc.Height / 2);
+			D3DSURFACE_DESC desc;
+			if (tex && SUCCEEDED(tex->GetLevelDesc(0, &desc)))
+			{
+				pos->x = (float)(desc.Width) * -1.0f;
+			}
+		}
+
+		if (pos->y == 0)
+		{
+			D3DSURFACE_DESC desc;
+			if (tex && SUCCEEDED(tex->GetLevelDesc(0, &desc)))
+			{
+				pos->y = (float)(g_screens[index].size.cy / 2 - desc.Height / 2);
+			}
 		}
 	}
 
@@ -568,7 +599,8 @@ HRESULT InitDXGraphics()
 		Exception(L"InitDXGraphics SetViewport", hr);
 
 	// Create a sprite.
-	hr = D3DXCreateTextureFromFile(g_pD3DDevice, g_szSpriteFile, &g_pD3DTexture);
+	LPCWSTR tex = g_rotMode ? g_szSpriteRotFile : g_szSpriteFile;
+	hr = D3DXCreateTextureFromFile(g_pD3DDevice, tex, &g_pD3DTexture);
 	if (FAILED(hr))
 		Exception(L"[InitDXGraphics] D3DXCreateTextureFromFile failed.", hr);
 
