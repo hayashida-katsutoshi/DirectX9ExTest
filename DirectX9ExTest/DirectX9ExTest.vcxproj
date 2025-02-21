@@ -18,6 +18,15 @@
       <Platform>x64</Platform>
     </ProjectConfiguration>
   </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="DirectX.cpp" />
+    <ClCompile Include="Main.cpp" />
+    <ClCompile Include="Window.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="DirectX.h" />
+    <ClInclude Include="Window.h" />
+  </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>17.0</VCProjectVersion>
     <Keyword>Win32Proj</Keyword>
@@ -112,7 +121,8 @@
       <AdditionalLibraryDirectories>$(DXSDK_DIR)\lib\x64;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     </Link>
     <PostBuildEvent>
-      <Command>xcopy /y /e /i $(SolutionDir)data $(OutDir)data</Command>
+      <Command>xcopy /y /e /i $(SolutionDir)data $(OutDir)data &amp;
+xcopy /y /e /i $(SolutionDir)dlls\$(Configuration) $(OutDir)</Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
@@ -133,12 +143,10 @@
       <AdditionalLibraryDirectories>$(DXSDK_DIR)\lib\x64</AdditionalLibraryDirectories>
     </Link>
     <PostBuildEvent>
-      <Command>xcopy /y /e /i $(SolutionDir)data $(OutDir)data</Command>
+      <Command>xcopy /y /e /i $(SolutionDir)data $(OutDir)data &amp;
+xcopy /y /e /i $(SolutionDir)dlls\$(Configuration) $(OutDir)</Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
-  <ItemGroup>
-    <ClCompile Include="main.cpp" />
-  </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>
