@@ -1,4 +1,5 @@
-﻿#include <map>
+﻿#include <vector>
+#include <map>
 #include <fstream>
 #include "DirectX.h"
 
@@ -32,8 +33,9 @@ const DWORD RenderingFVF = (D3DFVF_XYZRHW | D3DFVF_DIFFUSE | D3DFVF_TEX1);
 
 extern LPCWSTR g_WindowClassName;
 
-static LPDIRECT3D9	g_pD3DInterface;
-static LPDIRECT3DDEVICE9 g_pD3DDevice;
+static LPDIRECT3D9EX	g_pD3DInterface;
+static LPDIRECT3DDEVICE9EX g_pD3DDevice;
+
 std::map<std::string, TEXTURE_DATA*> g_TextureList;
 static const TEXTURE_DATA* g_pCurrentTexture;
 
@@ -227,8 +229,7 @@ void DrawPrimitive(int x, int y, DWORD color)
 
 bool CreateInterface()
 {
-	g_pD3DInterface = Direct3DCreate9(D3D_SDK_VERSION);
-	if (g_pD3DInterface == nullptr)
+	if (FAILED(Direct3DCreate9Ex(D3D_SDK_VERSION, &g_pD3DInterface)))
 	{
 		return false;
 	}
@@ -250,11 +251,12 @@ void SetUpPresentParameter(HWND window_handle, int widow_width, int window_heigh
 
 bool CreateGraphicsDevice(D3DPRESENT_PARAMETERS *present_param, HWND window_handle)
 {
-	if (FAILED(g_pD3DInterface->CreateDevice(D3DADAPTER_DEFAULT,
+	if (FAILED(g_pD3DInterface->CreateDeviceEx(D3DADAPTER_DEFAULT,
 		D3DDEVTYPE_HAL,
 		window_handle,
 		D3DCREATE_HARDWARE_VERTEXPROCESSING | D3DCREATE_MULTITHREADED,
 		present_param,
+		NULL,
 		&g_pD3DDevice)))
 	{
 		return false;
@@ -418,7 +420,7 @@ bool LoadingTexture(const char* file_name)
 					1,
 					0,
 					D3DFMT_UNKNOWN,
-					D3DPOOL_MANAGED,
+					D3DPOOL_DEFAULT,
 					D3DX_DEFAULT,
 					D3DX_DEFAULT,
 					0x0000ff00,
