@@ -1,0 +1,5 @@
+ps_1_1
+tex t0
+mul r1, t0, v0
+mov r0, r1
+nop
