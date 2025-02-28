@@ -71,6 +71,8 @@ LPDIRECT3DTEXTURE9		g_pD3DTexture = NULL;		// Texture for sprite.
 WCHAR g_szSpriteFile[] = L".\\data\\canvas.dds";	// Location of texture data.
 WCHAR g_szSpriteRotFile[] = L".\\data\\canvas_rot.dds";
 
+UINT g_backBufferCount = 2;
+
 /*-------------------------------------------
 
 --------------------------------------------*/
@@ -171,6 +173,28 @@ void SetCommandLineArgs()
 		else if (opt.compare("--rot") == 0)
 		{
 			g_rotMode = true;
+		}
+		else if (opt.compare("--bbcount") == 0)
+		{
+			LPWSTR optval = argv[i + 1];
+			try
+			{
+				if (optval == NULL)
+					throw std::runtime_error("The option value is null.");
+
+				UINT val = std::stoi(optval);
+				if (val > D3DPRESENT_BACK_BUFFERS_MAX_EX)
+				{
+					val = D3DPRESENT_BACK_BUFFERS_MAX_EX;
+				}
+				g_backBufferCount = val;
+			}
+			catch (std::exception e)
+			{
+				std::wstringstream	ss;
+				ss << e.what() << "\n" << "Invalid parameter (" << (optval == NULL ? L"0" : optval) << ") for --bbcount option.";
+				Exception(ss.str().c_str(), S_FALSE);
+			}
 		}
 	}
 }
@@ -541,7 +565,7 @@ HRESULT InitDXGraphics()
 		g_D3DPP[i].BackBufferWidth				= g_screens[i].size.cx;
 		g_D3DPP[i].BackBufferHeight				= g_screens[i].size.cy;
 		g_D3DPP[i].BackBufferFormat				= g_formatFull;
-		g_D3DPP[i].BackBufferCount				= 1;
+		g_D3DPP[i].BackBufferCount				= g_backBufferCount;
 		g_D3DPP[i].MultiSampleType				= g_multiSampleType;
 		g_D3DPP[i].MultiSampleQuality			= 0;
 		g_D3DPP[i].hDeviceWindow				= g_hWindow[i];
