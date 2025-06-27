@@ -603,9 +603,9 @@ HRESULT InitDXGraphics()
 	D3DPRESENT_PARAMETERS val = { 0 };
 	g_D3DPP.resize(g_screens.size(), val);
 
-	DWORD BehaviorFlags = D3DCREATE_HARDWARE_VERTEXPROCESSING;
+	DWORD BehaviorFlags = D3DCREATE_MIXED_VERTEXPROCESSING;
 	BehaviorFlags |= D3DCREATE_MULTITHREADED;
-	BehaviorFlags |= D3DCREATE_DISABLE_DRIVER_MANAGEMENT_EX;
+	//BehaviorFlags |= D3DCREATE_DISABLE_DRIVER_MANAGEMENT_EX;
 	if (g_screens.size() >= 2)
 	{
 		BehaviorFlags |= D3DCREATE_ADAPTERGROUP_DEVICE;
@@ -622,7 +622,8 @@ HRESULT InitDXGraphics()
 		g_D3DPP[i].hDeviceWindow				= g_hWindow[i];
 		g_D3DPP[i].SwapEffect					= D3DSWAPEFFECT_DISCARD;
 		g_D3DPP[i].Windowed = FALSE;
-		g_D3DPP[i].FullScreen_RefreshRateInHz = D3DPRESENT_RATE_DEFAULT;
+		g_D3DPP[i].FullScreen_RefreshRateInHz	= 60;
+//		g_D3DPP[i].FullScreen_RefreshRateInHz	= D3DPRESENT_RATE_DEFAULT;
 		{
 			// Multihead (Direct3D 9)
 			// https://learn.microsoft.com/en-us/windows/win32/direct3d9/multihead
@@ -632,7 +633,7 @@ HRESULT InitDXGraphics()
 			//		BackBufferHeight
 			//		BackBufferFormat
 			g_D3DPP[i].EnableAutoDepthStencil		= FALSE;
-			g_D3DPP[i].AutoDepthStencilFormat		= D3DFMT_UNKNOWN;
+			g_D3DPP[i].AutoDepthStencilFormat		= D3DFMT_D24S8;
 		}
 		g_D3DPP[i].Flags						= 0;
 //		g_D3DPP[i].PresentationInterval			= D3DPRESENT_INTERVAL_IMMEDIATE;
