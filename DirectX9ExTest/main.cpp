@@ -60,6 +60,8 @@ bool		g_rebootTriggered = false;
 
 UINT		g_frameCount = 0;
 
+int			g_fps = 0;
+
 /*-------------------------------------------
 	Global variables(DirectX)
 --------------------------------------------*/
@@ -79,6 +81,7 @@ WCHAR g_szSpriteRotFile[] = L".\\data\\canvas_rot.dds";
 
 UINT g_backBufferCount = 2;
 
+// Font
 ID3DXFont* g_pFont = NULL; 
 
 /*-------------------------------------------
@@ -108,6 +111,7 @@ bool CleanupApp(void);
 LRESULT CALLBACK MainWndProc(HWND hWnd,UINT msg,UINT wParam,LONG lParam);
 int RebootProcess();
 void RebootTriggered();
+void MeasureFramePerSecond();
 
 /*-------------------------------------------
 
@@ -518,9 +522,9 @@ void InitFont(LPDIRECT3DDEVICE9 pDevice)
 	D3DXCreateFont(pDevice, 24, 0, FW_NORMAL, 1, FALSE, DEFAULT_CHARSET,
 		OUT_DEFAULT_PRECIS, DEFAULT_QUALITY, DEFAULT_PITCH | FF_DONTCARE, NULL, &g_pFont);
 }
-void DrawText(LPCWSTR text)
+void DrawText(LPCWSTR text, int x, int y, int w, int h)
 {
-	RECT rect = { 100, 100, 600, 200 };
+	RECT rect = { x, y, x + w, y + h };
 	g_pFont->DrawText(NULL, text, -1, &rect, DT_LEFT | DT_TOP, D3DCOLOR_ARGB(255, 255, 255, 255));
 }
 void ReleaseFont()
@@ -725,7 +729,11 @@ HRESULT Render(void)
 		// Draw scene
 		if (SUCCEEDED(g_pD3DDevice->BeginScene()))
 		{
-			DrawText((L"RebootCount : " + std::to_wstring((_ULonglong)g_rebootCount)).c_str());
+			DrawText((L"FPS : " + std::to_wstring((_ULonglong)g_fps)).c_str(), 10, 10, 300, 30);
+			if (g_rebootSec > 0)
+			{
+				DrawText((L"RebootCount : " + std::to_wstring((_ULonglong)g_rebootCount)).c_str(), 10, 40, 600, 200);
+			}
 
 			// Draw sprite
 			if( g_pD3DXSprite )
@@ -931,6 +939,8 @@ bool AppIdle(void)
 		g_bDeviceLost = false;
 	}
 
+	MeasureFramePerSecond();
+
 	hr = Render();
 	if (hr == D3DERR_DEVICELOST)
 		g_bDeviceLost = true;
@@ -1037,4 +1047,35 @@ void RebootTriggered()
 	{
 		g_rebootTriggered = true;
 	}	
+}
+
+void MeasureFramePerSecond()
+{
+	// 静的変数で前回のカウンタ値を保持
+	static LARGE_INTEGER s_lastCounter = { 0 };
+	static LARGE_INTEGER s_frequency = { 0 };
+	static int newFps = 0;
+	static double mTimeCount = 0;
+
+	// 初回のみ周波数を取得
+	if (s_frequency.QuadPart == 0) {
+		QueryPerformanceFrequency(&s_frequency);
+		QueryPerformanceCounter(&s_lastCounter);
+	}
+
+	// 毎フレーム呼び出す
+	LARGE_INTEGER now;
+	QueryPerformanceCounter(&now);
+	double deltaTime = (double)(now.QuadPart - s_lastCounter.QuadPart) * 1000.0 / s_frequency.QuadPart;
+	s_lastCounter = now;
+
+	mTimeCount += deltaTime;
+	newFps++;
+
+	if (mTimeCount >= 1000)
+	{
+		mTimeCount = 0;
+		g_fps = newFps;
+		newFps = 0;
+	}
 }
