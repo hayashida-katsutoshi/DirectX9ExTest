@@ -62,6 +62,8 @@ UINT		g_frameCount = 0;
 
 int			g_fps = 0;
 
+int			g_objCount = 0;
+
 /*-------------------------------------------
 	Global variables(DirectX)
 --------------------------------------------*/
@@ -78,6 +80,10 @@ LPD3DXSPRITE			g_pD3DXSprite = NULL;		// Sprite
 LPDIRECT3DTEXTURE9		g_pD3DTexture = NULL;		// Texture for sprite.
 WCHAR g_szSpriteFile[] = L".\\data\\canvas.dds";	// Location of texture data.
 WCHAR g_szSpriteRotFile[] = L".\\data\\canvas_rot.dds";
+
+// TestTexture
+LPDIRECT3DTEXTURE9		g_pBgTexture = NULL;
+WCHAR g_szBgTextureFile[] = L".\\data\\SL_BlindPanel_en_r001.dds";
 
 UINT g_backBufferCount = 2;
 
@@ -673,6 +679,10 @@ HRESULT InitDXGraphics()
 	if (FAILED(hr))
 		Exception(L"[InitDXGraphics] D3DXCreateTextureFromFile failed.", hr);
 
+	hr = D3DXCreateTextureFromFile(g_pD3DDevice, g_szBgTextureFile, &g_pBgTexture);
+	if (FAILED(hr))
+		Exception(L"[InitDXGraphics] D3DXCreateTextureFromFile(BgTexture) failed.", hr);
+
 	hr = D3DXCreateSprite(g_pD3DDevice, &g_pD3DXSprite);
 	if (FAILED(hr))
 		Exception(L"[InitDXGraphics] D3DXCreateSprite failed.", hr);
@@ -729,18 +739,29 @@ HRESULT Render(void)
 		// Draw scene
 		if (SUCCEEDED(g_pD3DDevice->BeginScene()))
 		{
-			DrawText((L"FPS : " + std::to_wstring((_ULonglong)g_fps)).c_str(), 10, 10, 300, 30);
-			if (g_rebootSec > 0)
-			{
-				DrawText((L"RebootCount : " + std::to_wstring((_ULonglong)g_rebootCount)).c_str(), 10, 40, 600, 200);
-			}
-
 			// Draw sprite
 			if( g_pD3DXSprite )
 			{
 				g_pD3DXSprite->Begin(D3DXSPRITE_ALPHABLEND | D3DXSPRITE_DONOTSAVESTATE);
-				g_pD3DXSprite->Draw(g_pD3DTexture, NULL, NULL, &GetScrollPos(i, 5.0f, g_pD3DTexture), D3DCOLOR_ARGB(255,255,255,255));
+				if (i == 0)
+				{
+					static D3DXVECTOR3* pos = new D3DXVECTOR3(0.0, 0.0, 0.0);
+					for (int num = 0; num < g_objCount; num++)
+					{
+						pos->x = (float)(num % 150) * 10;
+						pos->y = (float)(num / 150) * 10;
+						g_pD3DXSprite->Draw(g_pBgTexture, NULL, NULL, pos, D3DCOLOR_ARGB(255, 255, 255, 255));
+					}
+				}
+				g_pD3DXSprite->Draw(g_pD3DTexture, NULL, NULL, &GetScrollPos(i, 5.0f, g_pD3DTexture), D3DCOLOR_ARGB(255, 255, 255, 255));
 				g_pD3DXSprite->End();
+			}
+
+			DrawText((L"FPS : " + std::to_wstring((_ULonglong)g_fps)).c_str(), 10, 10, 300, 30);
+			DrawText((L"Objects : " + std::to_wstring((_ULonglong)g_objCount)).c_str(), 10, 10 + (30 * 1), 300, 30);
+			if (g_rebootSec > 0)
+			{
+				DrawText((L"RebootCount : " + std::to_wstring((_ULonglong)g_rebootCount)).c_str(), 10, 10 + (30 * 2), 600, 200);
 			}
 
 			g_pD3DDevice->EndScene();
@@ -885,6 +906,19 @@ LRESULT CALLBACK MainWndProc(HWND hWnd, UINT msg, UINT wParam, LONG lParam)
 		{
 		case VK_ESCAPE:
 			PostMessage(hWnd, WM_CLOSE, 0, 0);
+			break;
+
+		case VK_LEFT:
+			g_objCount = max(0, g_objCount - 1);
+			break;
+		case VK_RIGHT:
+			g_objCount = min(g_objCount + 1, INT_MAX);
+			break;
+		case VK_UP:
+			g_objCount = min(g_objCount + 10, INT_MAX);
+			break;
+		case VK_DOWN:
+			g_objCount = max(0, g_objCount - 10);
 			break;
 		}
 		break;
