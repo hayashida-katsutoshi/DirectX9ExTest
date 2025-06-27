@@ -54,6 +54,12 @@ D3DMULTISAMPLE_TYPE g_multiSampleType = D3DMULTISAMPLE_NONE;
 
 bool		g_rotMode = false;
 
+UINT		g_rebootSec = 0;
+UINT		g_rebootCount = 0;
+bool		g_rebootTriggered = false;
+
+UINT		g_frameCount = 0;
+
 /*-------------------------------------------
 	Global variables(DirectX)
 --------------------------------------------*/
@@ -72,6 +78,8 @@ WCHAR g_szSpriteFile[] = L".\\data\\canvas.dds";	// Location of texture data.
 WCHAR g_szSpriteRotFile[] = L".\\data\\canvas_rot.dds";
 
 UINT g_backBufferCount = 2;
+
+ID3DXFont* g_pFont = NULL; 
 
 /*-------------------------------------------
 
@@ -98,6 +106,8 @@ bool CleanupApp(void);
 
 --------------------------------------------*/
 LRESULT CALLBACK MainWndProc(HWND hWnd,UINT msg,UINT wParam,LONG lParam);
+int RebootProcess();
+void RebootTriggered();
 
 /*-------------------------------------------
 
@@ -195,6 +205,16 @@ void SetCommandLineArgs()
 				ss << e.what() << "\n" << "Invalid parameter (" << (optval == NULL ? L"0" : optval) << ") for --bbcount option.";
 				Exception(ss.str().c_str(), S_FALSE);
 			}
+		}
+		else if (opt.compare("--reboot") == 0)
+		{
+			LPWSTR optval = argv[i + 1];
+			g_rebootSec = std::stoi(optval);
+		}
+		else if (opt.compare("--rebootCount") == 0)
+		{
+			LPWSTR optval = argv[i + 1];
+			g_rebootCount = std::stoi(optval);
 		}
 	}
 }
@@ -493,6 +513,27 @@ void CreateDisplayInfo()
 /*-------------------------------------------
 
 --------------------------------------------*/
+void InitFont(LPDIRECT3DDEVICE9 pDevice)
+{
+	D3DXCreateFont(pDevice, 24, 0, FW_NORMAL, 1, FALSE, DEFAULT_CHARSET,
+		OUT_DEFAULT_PRECIS, DEFAULT_QUALITY, DEFAULT_PITCH | FF_DONTCARE, NULL, &g_pFont);
+}
+void DrawText(LPCWSTR text)
+{
+	RECT rect = { 100, 100, 600, 200 };
+	g_pFont->DrawText(NULL, text, -1, &rect, DT_LEFT | DT_TOP, D3DCOLOR_ARGB(255, 255, 255, 255));
+}
+void ReleaseFont()
+{
+	if (g_pFont) {
+		g_pFont->Release();
+		g_pFont = NULL;
+	}
+}
+
+/*-------------------------------------------
+
+--------------------------------------------*/
 HRESULT InitApp(HINSTANCE hInst)
 {
 	g_hInstance = hInst;
@@ -640,6 +681,8 @@ HRESULT InitDXGraphics()
 --------------------------------------------*/
 HRESULT InitD3DObject(void)
 {
+	InitFont(g_pD3DDevice);
+
 	if (g_pD3DXSprite)
 		g_pD3DXSprite->OnResetDevice();
 
@@ -682,6 +725,8 @@ HRESULT Render(void)
 		// Draw scene
 		if (SUCCEEDED(g_pD3DDevice->BeginScene()))
 		{
+			DrawText((L"RebootCount : " + std::to_wstring((_ULonglong)g_rebootCount)).c_str());
+
 			// Draw sprite
 			if( g_pD3DXSprite )
 			{
@@ -767,6 +812,8 @@ HRESULT ChangeWindowSize(void)
 --------------------------------------------*/
 bool CleanupDXGraphics(void)
 {
+	ReleaseFont();
+
 	SAFE_RELEASE(g_pD3DXSprite);
 	SAFE_RELEASE(g_pD3DTexture);
 
@@ -890,6 +937,14 @@ bool AppIdle(void)
 	else if (FAILED(hr))
 		return false;
 
+	if (g_rebootSec > 0 && !IsDebuggerPresent())
+	{
+		if (++g_frameCount == 60 * g_rebootSec)
+		{
+			RebootTriggered();
+		}
+	}
+
 	return true;
 }
 
@@ -939,5 +994,47 @@ int WINAPI wWinMain(HINSTANCE hInst, HINSTANCE, LPWSTR, int)
 
 	CleanupApp();
 
+	if (g_rebootTriggered)
+	{
+		RebootProcess();
+	}
+
 	return (int)msg.wParam;
+}
+
+/*--------------------------------------------
+
+---------------------------------------------*/
+int RebootProcess()
+{
+	char path[MAX_PATH];
+	GetModuleFileNameA(NULL, path, MAX_PATH);
+
+	STARTUPINFOA si = { sizeof(si) };
+	PROCESS_INFORMATION pi;
+
+	++g_rebootCount;
+	std::string cmd = GetCommandLineA();
+	std::string extra = " --rebootCount " + std::to_string((_ULonglong)g_rebootCount);
+	std::string newCmd = cmd + extra;
+
+	if (CreateProcessA(
+		path,
+		const_cast<LPSTR>(newCmd.c_str()),
+		NULL, NULL, FALSE, 0, NULL, NULL, &si, &pi))
+	{
+		return 0;
+	}
+	else {
+		MessageBoxA(NULL, "Reboot failed.", "Error", MB_OK);
+		return 1;
+	}
+}
+
+void RebootTriggered()
+{
+	if (DestroyWindow(g_hWindow[0]))
+	{
+		g_rebootTriggered = true;
+	}	
 }
