@@ -16,6 +16,7 @@
 #include <sstream>
 #include <d3dx9math.h>
 #include <vector>
+#include <mmsystem.h>
 
 // Link required libraries.
 #pragma comment( lib, "d3d9.lib" )
@@ -26,6 +27,7 @@
 #endif
 #pragma comment( lib, "dxerr.lib" )
 #pragma comment( lib, "dxguid.lib" )
+#pragma comment( lib, "winmm.lib")
 
 #define STR_BUF_SIZE	256
 
@@ -118,6 +120,10 @@ LRESULT CALLBACK MainWndProc(HWND hWnd,UINT msg,UINT wParam,LONG lParam);
 int RebootProcess();
 void RebootTriggered();
 void MeasureFramePerSecond();
+
+void resetSync();
+bool preSync();
+void postSync();
 
 /*-------------------------------------------
 
@@ -585,6 +591,8 @@ HRESULT InitApp(HINSTANCE hInst)
 		UpdateWindow(g_hWindow[i]);
 	}
 
+	resetSync();
+
 	return S_OK;
 }
 
@@ -769,8 +777,16 @@ HRESULT Render(void)
 		}
 	}
 
-	// Show scene.
-	return g_pD3DDevice->Present(NULL, NULL, NULL, NULL);
+	bool needSync = preSync();
+
+	if (needSync && FAILED(g_pD3DDevice->Present(NULL, NULL, NULL, NULL)))
+	{
+		return S_FALSE;
+	}
+
+	postSync();
+
+	return S_OK;
 }
 
 /*-------------------------------------------
@@ -1113,4 +1129,91 @@ void MeasureFramePerSecond()
 		g_fps = newFps;
 		newFps = 0;
 	}
+}
+
+#define SYNC_FRAMES 16
+#define TIME_RES 1
+#define WAIT_SLEEP_THRESHOLD (2*TIME_RES)
+#define WAIT_YIELD_THRESHOLD (1*TIME_RES)
+
+static struct {
+	ULONG syncTime[SYNC_FRAMES];
+	ULONG cur;
+	ULONG last;
+}d;
+
+ULONG GetTick()
+{
+	MMTIME time;
+	timeGetSystemTime(&time, sizeof(time));
+	return time.u.ms;
+}
+
+
+ULONG Wait(ULONG target, ULONG t0 = GetTick())
+{
+	if (target <= 0) {
+		ULONG t1 = GetTick();
+		return t1 - t0;
+	}
+	if (target >= 1000 * TIME_RES) {		// mistake?
+		target = 1000 * TIME_RES;
+	}
+
+
+	ULONG diff;
+	while (1) {
+		ULONG t1 = GetTick();
+		diff = t1 - t0;
+		if (diff < 0) {
+			return diff; 					// Overflow?
+		}
+		if (diff >= target) {				// Exit when the target time is reached.
+			return diff;
+		}
+
+		if (target - diff > WAIT_SLEEP_THRESHOLD) {
+			Sleep(1);						// Sleep and wait if afford it.
+		}
+		else if (target - diff > WAIT_YIELD_THRESHOLD) {
+			Sleep(0);						// Just switching if not afford it.
+		}
+		else {
+		}
+	}
+}
+
+void resetSync()
+{
+	d.cur = 0;
+	d.last = 0;
+
+	for (UINT i = 0; i < SYNC_FRAMES; i++) {
+		d.syncTime[i] = GetTick();
+	}
+}
+
+void Sync(UINT refresh)
+{
+	ULONG cur = GetTick();
+	ULONG diff = cur - d.syncTime[d.last];
+	ULONG one = 1000 * TIME_RES / refresh;
+	if (one > diff && one - diff > 2 * TIME_RES) {
+		ULONG n = (one - diff - TIME_RES);
+		Wait(n);
+	}
+}
+
+bool preSync()
+{
+	Sync(60);
+	return true;
+}
+
+void postSync()
+{
+	d.syncTime[d.cur] = GetTick();
+
+	d.last = d.cur;
+	d.cur = (d.cur + 1) % SYNC_FRAMES;
 }
