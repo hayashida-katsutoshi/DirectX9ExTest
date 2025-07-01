@@ -21,6 +21,15 @@
 |--msaa|none|Enable MSAA<br>default(no option): disabled|
 |--rot|none|Rotate scrolling image and position.<br>Tearing check for landscape mode resolution.|
 |--bbcount|0-30(D3DPRESENT_BACK_BUFFERS_MAX_EX)|The value of D3DPRESENT_PARAMETERS::BackBufferCount.<br>default(no option): 2|
+|--reboot|\<time\>|Specify reboot interval(sec.)|
+
+## Keyboard Control
+|Key|Function|
+|---|---|
+|Left Arrow|Remove one graphic object|
+|Right Arrow|Add one graphic object|
+|Up Arrow|Add ten graphic object|
+|Down Arrow|Remove ten graphic object|
 
 ## Command Line Usage Example
   - Primary: 2160x3840, Secondary: 1920x1080, MSAA enabled
