@@ -55,6 +55,7 @@ bool		g_bActive		= false;
 D3DMULTISAMPLE_TYPE g_multiSampleType = D3DMULTISAMPLE_NONE;
 
 bool		g_rotMode = false;
+bool		g_noWaitMode = false;
 
 UINT		g_rebootSec = 0;
 UINT		g_rebootCount = 0;
@@ -201,6 +202,10 @@ void SetCommandLineArgs()
 		else if (opt.compare("--rot") == 0)
 		{
 			g_rotMode = true;
+		}
+		else if (opt.compare("--nowait") == 0)
+		{
+			g_noWaitMode = true;
 		}
 		else if (opt.compare("--bbcount") == 0)
 		{
@@ -1211,6 +1216,9 @@ void Sync(UINT refresh)
 
 bool preSync()
 {
+	if (g_noWaitMode)
+		return true;
+
 	Sync(60);
 	return true;
 }
