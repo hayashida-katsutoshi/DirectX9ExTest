@@ -549,6 +549,42 @@ void ReleaseFont()
 	}
 }
 
+void DrawDebugInfo()
+{
+	#define ENDL std::endl; line++;
+
+	std::wstringstream wss;
+	int line = 0;
+
+	wss << L"FPS : " << g_fps << ENDL
+	wss << L"Objects : " << g_objCount << ENDL
+	if (g_rebootSec > 0)
+	{
+		wss << L"Reboot Count : " << g_rebootCount << ENDL
+	}
+	for (int i = 0; i < g_screens.size(); i++)
+	{
+		wss << L"Screen " << i << L" : " << g_screens[i].size.cx << L"x" << g_screens[i].size.cy << ENDL
+	}
+	if (g_backBufferCount > 0)
+	{
+		wss << L"Back Buffer : " << g_backBufferCount << ENDL
+	}
+	if (g_multiSampleType > 0)
+	{
+		wss << L"MSAA : " << g_multiSampleType << ENDL
+	}
+	if (g_rotMode)
+	{
+		wss << L"Rot Mode" << ENDL
+	}
+	if (g_noWaitMode)
+	{
+		wss << L"No Wait Mode" << ENDL
+	}
+	DrawText(wss.str().c_str(), 30, 30, 300, (30 * line));
+}
+
 /*-------------------------------------------
 
 --------------------------------------------*/
@@ -774,11 +810,10 @@ HRESULT Render(void)
 				g_pD3DXSprite->End();
 			}
 
-			DrawText((L"FPS : " + std::to_wstring((_ULonglong)g_fps)).c_str(), 10, 10, 300, 30);
-			DrawText((L"Objects : " + std::to_wstring((_ULonglong)g_objCount)).c_str(), 10, 10 + (30 * 1), 300, 30);
-			if (g_rebootSec > 0)
+			// Draw debug info.
+			if (i == 0)
 			{
-				DrawText((L"RebootCount : " + std::to_wstring((_ULonglong)g_rebootCount)).c_str(), 10, 10 + (30 * 2), 600, 200);
+				DrawDebugInfo();
 			}
 
 			g_pD3DDevice->EndScene();
