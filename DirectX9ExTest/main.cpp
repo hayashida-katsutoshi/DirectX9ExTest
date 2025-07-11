@@ -448,21 +448,27 @@ static D3DXVECTOR3 GetScrollPos(int index, float velocity, LPDIRECT3DTEXTURE9 te
 --------------------------------------------*/
 static D3DDISPLAYMODEEX *SetupDisplayModeEx(D3DPRESENT_PARAMETERS *pdpp, UINT numberOfAdaptersInGroup)
 {
-	D3DDISPLAYMODEEX *dm = NULL;
+	if (numberOfAdaptersInGroup == 0 || pdpp == nullptr)
+		return nullptr;
 
-	if (pdpp && pdpp->Windowed == FALSE)
+	for (UINT i = 0; i < numberOfAdaptersInGroup; ++i)
 	{
-		dm = new D3DDISPLAYMODEEX[sizeof(D3DDISPLAYMODEEX)*numberOfAdaptersInGroup];
-		for( UINT i = 0; i < numberOfAdaptersInGroup; ++i )
-		{
-			D3DDISPLAYMODEEX *p = &dm[i];
-			p->Format = pdpp[i].BackBufferFormat;
-			p->Height = pdpp[i].BackBufferHeight;
-			p->Width = pdpp[i].BackBufferWidth;
-			p->ScanLineOrdering = D3DSCANLINEORDERING_PROGRESSIVE;
-			p->RefreshRate = pdpp[i].FullScreen_RefreshRateInHz;
-			p->Size = sizeof(D3DDISPLAYMODEEX);
-		}
+		if (pdpp[i].Windowed == TRUE)
+			return nullptr;
+	}
+
+	D3DDISPLAYMODEEX* dm = new D3DDISPLAYMODEEX[numberOfAdaptersInGroup];
+	ZeroMemory(dm, sizeof(D3DDISPLAYMODEEX) * numberOfAdaptersInGroup);
+
+	for( UINT i = 0; i < numberOfAdaptersInGroup; ++i )
+	{
+		D3DDISPLAYMODEEX *p = &dm[i];
+		p->Size = sizeof(D3DDISPLAYMODEEX);
+		p->Format = pdpp[i].BackBufferFormat;
+		p->Height = pdpp[i].BackBufferHeight;
+		p->Width = pdpp[i].BackBufferWidth;
+		p->ScanLineOrdering = D3DSCANLINEORDERING_PROGRESSIVE;
+		p->RefreshRate = pdpp[i].FullScreen_RefreshRateInHz;
 	}
 
 	return dm;
@@ -667,7 +673,7 @@ HRESULT InitDXGraphics()
 		g_D3DPP[i].MultiSampleQuality			= 0;
 		g_D3DPP[i].hDeviceWindow				= g_hWindow[i];
 		g_D3DPP[i].SwapEffect					= D3DSWAPEFFECT_DISCARD;
-		g_D3DPP[i].Windowed = FALSE;
+		g_D3DPP[i].Windowed                     = FALSE;
 		g_D3DPP[i].FullScreen_RefreshRateInHz	= 60;
 //		g_D3DPP[i].FullScreen_RefreshRateInHz	= D3DPRESENT_RATE_DEFAULT;
 		{
@@ -698,7 +704,10 @@ HRESULT InitDXGraphics()
 						BehaviorFlags, &g_D3DPP[0], dm, &g_pD3DDevice);
 		if (FAILED(hr))
 		{
-			free(dm);
+			if (dm)
+			{
+				delete[] dm;
+			}
 			Exception(L"[InitDXGraphics] CreateDevice failed.", hr);
 		}
 	}
