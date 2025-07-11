@@ -125,6 +125,8 @@ void resetSync();
 bool preSync();
 void postSync();
 
+void DrawRotationBox(int x, int y, int w, int h, DWORD color);
+
 /*-------------------------------------------
 
 --------------------------------------------*/
@@ -361,23 +363,18 @@ static int FindAdapter()
 	return 0;
 }
 
-static D3DCOLOR GetClearColor(int index)
+static D3DCOLOR GetClearColor(UINT index)
 {
 	D3DCOLOR ClearColor[] =
 	{
 		D3DCOLOR_XRGB(0, 0, 255),
 		D3DCOLOR_XRGB(0, 255, 0),
 		D3DCOLOR_XRGB(255, 0, 0),
-		D3DCOLOR_XRGB(255, 0, 255),
+		D3DCOLOR_XRGB(255, 255, 0),
 	};
 
 	int num = _countof(ClearColor);
-	if( index > num-1 )
-	{
-		index = num-1;
-	}
-
-	return ClearColor[index];
+	return ClearColor[index % num];
 }
 
 static D3DXVECTOR3 GetScrollPos(int index, float velocity, LPDIRECT3DTEXTURE9 tex)
@@ -748,6 +745,12 @@ HRESULT Render(void)
 		// Draw scene
 		if (SUCCEEDED(g_pD3DDevice->BeginScene()))
 		{
+			// Draw rotation box
+			int x = g_D3DPP[i].BackBufferWidth / 2;
+			int y = g_D3DPP[i].BackBufferHeight / 2;
+			int h = (x > y ? x : y) * 2;
+			DrawRotationBox(x, y, 100, h, GetClearColor(i - 1));
+
 			// Draw sprite
 			if( g_pD3DXSprite )
 			{
@@ -1000,11 +1003,13 @@ bool AppIdle(void)
 
 	if (g_rebootSec > 0 && !IsDebuggerPresent())
 	{
-		if (++g_frameCount == 60 * g_rebootSec)
+		if (g_frameCount == 60 * g_rebootSec)
 		{
 			RebootTriggered();
 		}
 	}
+
+	++g_frameCount;
 
 	return true;
 }
@@ -1216,4 +1221,45 @@ void postSync()
 
 	d.last = d.cur;
 	d.cur = (d.cur + 1) % SYNC_FRAMES;
+}
+
+/*--------------------------------------------
+
+--------------------------------------------*/
+typedef struct
+{
+	D3DXVECTOR4 pos;
+	DWORD color;
+} CUSTOM_VERTEX;
+
+const DWORD BOXFVF = (D3DFVF_XYZRHW | D3DFVF_DIFFUSE);
+
+void DrawRotationBox(int x, int y, int w, int h, DWORD color)
+{
+	float px = (float)(w >> 1), py = (float)(h >> 1);
+	CUSTOM_VERTEX v[] =
+	{
+		{ D3DXVECTOR4(-px, -py, .0f, 1.0f), color},
+		{ D3DXVECTOR4( px, -py, .0f, 1.0f), color},
+		{ D3DXVECTOR4(-px,  py, .0f, 1.0f), color},
+		{ D3DXVECTOR4(-px,  py, .0f, 1.0f), color},
+		{ D3DXVECTOR4( px, -py, .0f, 1.0f), color},
+		{ D3DXVECTOR4( px,  py, .0f, 1.0f), color},
+	};
+
+	float angle = D3DXToRadian(g_frameCount);
+	size_t size = sizeof(v) / sizeof(v[0]);
+	for (int i = 0; i < size; i++)
+	{
+		float cosA = std::cos(angle);
+		float sinA = std::sin(angle);
+		float posx = v[i].pos.x * cosA - v[i].pos.y * sinA;
+		float posy = v[i].pos.x * sinA + v[i].pos.y * cosA;
+		v[i].pos.x = x + posx;
+		v[i].pos.y = y + posy;
+	}
+
+	g_pD3DDevice->SetFVF(BOXFVF);
+	g_pD3DDevice->SetTexture(0, 0);
+	g_pD3DDevice->DrawPrimitiveUP(D3DPT_TRIANGLELIST, 2, v, sizeof(CUSTOM_VERTEX));
 }
