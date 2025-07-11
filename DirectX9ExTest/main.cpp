@@ -495,11 +495,7 @@ BOOL CALLBACK MonitorEnumProc(HMONITOR hMonitor, HDC hdcMonitor, LPRECT lprcMoni
 		}
 	}
 	if (info == 0)
-	{
-		wchar_t stringBuf[STR_BUF_SIZE];
-		swprintf(stringBuf, STR_BUF_SIZE, L"[MonitorEnumProc] Display %s is not found", monitorInfo.szDevice);
-		Exception(stringBuf, S_FALSE);
-	}
+		return FALSE;
 
 	info->size.cx = monitorInfo.rcMonitor.right - monitorInfo.rcMonitor.left;
 	info->size.cy = monitorInfo.rcMonitor.bottom - monitorInfo.rcMonitor.top;
@@ -516,10 +512,13 @@ void CreateDisplayInfo()
 	IDirect3D9Ex* dd = 0;
 	Direct3DCreate9Ex(D3D_SDK_VERSION, &dd);
 	UINT count = dd->GetAdapterCount();
+	int masterAdapter = FindAdapter();
 	for (UINT adapter = 0; adapter < count; adapter++)
 	{
 		D3DCAPS9 pCaps;
 		dd->GetDeviceCaps(adapter, D3DDEVTYPE_HAL, &pCaps);
+		if (masterAdapter != pCaps.MasterAdapterOrdinal)
+			continue;
 
 		D3DADAPTER_IDENTIFIER9 id;
 		if (dd->GetAdapterIdentifier(pCaps.AdapterOrdinalInGroup, 0, &id) == D3D_OK)
@@ -532,6 +531,16 @@ void CreateDisplayInfo()
 	dd->Release();
 
 	EnumDisplayMonitors(NULL, NULL, MonitorEnumProc, 0);
+
+	for (int i = 0; i < g_screens.size(); i++)
+	{
+		if (g_screens[i].size.cx == 0 && g_screens[i].size.cy == 0)
+		{
+			wchar_t stringBuf[STR_BUF_SIZE];
+			swprintf(stringBuf, STR_BUF_SIZE, L"[CreateDisplayInfo] Invalid screen : %s", g_screens[i].deviceName);
+			Exception(stringBuf, S_FALSE);
+		}
+	}
 }
 
 /*-------------------------------------------
