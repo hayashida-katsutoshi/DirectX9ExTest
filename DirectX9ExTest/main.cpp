@@ -571,6 +571,7 @@ void DrawDebugInfo()
 	std::wstringstream wss;
 	int line = 0;
 
+	wss << L"Build : " << __DATE__ << " " << __TIME__ << ENDL;
 	wss << L"FPS : " << g_fps << ENDL
 	wss << L"Objects : " << g_objCount << ENDL
 	if (g_rebootSec > 0)
