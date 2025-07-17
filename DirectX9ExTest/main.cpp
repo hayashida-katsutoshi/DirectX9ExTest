@@ -849,21 +849,21 @@ HRESULT ChangeWindowSize(void)
 			g_bDeviceLost = true;
 		else
 		{
+			Exception(L"[ChangeWindowSize] ResetEx() failed.", hr);
 			for(int i = 0; i < g_hWindow.size(); i++ )
 			{
 				DestroyWindow(g_hWindow[i]);
 			}
 		}
-		Exception(L"[ChangeWindowSize] ResetEx() failed.", hr);
 	}
 	hr = InitD3DObject();
 	if (FAILED(hr))
 	{
+		Exception(L"[ChangeWindowSize] InitD3DObject failed.", hr);
 		for(int i = 0; i < g_hWindow.size(); i++ )
 		{
 			DestroyWindow(g_hWindow[i]);
 		}
-		Exception(L"[ChangeWindowSize] InitD3DObject failed.", hr);
 	}
 
 	// Viewport settings.
