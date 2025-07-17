@@ -500,14 +500,14 @@ BOOL CALLBACK MonitorEnumProc(HMONITOR hMonitor, HDC hdcMonitor, LPRECT lprcMoni
 			info = &g_screens[i];
 		}
 	}
-	if (info == 0)
-		return FALSE;
+	if (info != 0)
+	{
+		info->size.cx = monitorInfo.rcMonitor.right - monitorInfo.rcMonitor.left;
+		info->size.cy = monitorInfo.rcMonitor.bottom - monitorInfo.rcMonitor.top;
+		info->monitor = monitorInfo;
+	}
 
-	info->size.cx = monitorInfo.rcMonitor.right - monitorInfo.rcMonitor.left;
-	info->size.cy = monitorInfo.rcMonitor.bottom - monitorInfo.rcMonitor.top;
-	info->monitor = monitorInfo;
-
-	return TRUE;
+	return TRUE;	// Enumerate next monitor if TRUE.
 }
 
 /*-------------------------------------------
