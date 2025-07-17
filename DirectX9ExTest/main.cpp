@@ -159,6 +159,17 @@ std::vector<std::string> split(const std::string& s, char delim)
 	return elems;
 }
 
+SIZE GetResolutionFromString(std::wstring str)
+{
+	std::string val = WStringToString(str);
+	std::vector<std::string> params = split(val, 'x');
+
+	SIZE resolution;
+	resolution.cx = stoi(params[0]);
+	resolution.cy = stoi(params[1]);
+	return resolution;
+}
+
 void SetCommandLineArgs()
 {
 	int argc;
@@ -171,28 +182,23 @@ void SetCommandLineArgs()
 		std::string opt = WStringToString(argv[i]);
 		if (opt.compare("--primary") == 0)
 		{
-			std::string val = WStringToString(argv[i + 1]);
-			std::vector<std::string> params = split(val, 'x');
-
 			if (g_screens.size() > 0)
 			{
-				SIZE resolution;
-				resolution.cx = stoi(params[0]);
-				resolution.cy = stoi(params[1]);
-				g_screens[0].size = resolution;
+				g_screens[0].size = GetResolutionFromString(argv[i + 1]);
 			}
 		}
 		else if (opt.compare("--secondary") == 0)
 		{
-			std::string val = WStringToString(argv[i + 1]);
-			std::vector<std::string> params = split(val, 'x');
-
 			if (g_screens.size() > 1)
 			{
-				SIZE resolution;
-				resolution.cx = stoi(params[0]);
-				resolution.cy = stoi(params[1]);
-				g_screens[1].size = resolution;
+				g_screens[1].size = GetResolutionFromString(argv[i + 1]);
+			}
+		}
+		else if (opt.compare("--tertiary") == 0)
+		{
+			if (g_screens.size() > 2)
+			{
+				g_screens[2].size = GetResolutionFromString(argv[i + 1]);
 			}
 		}
 		else if (opt.compare("--msaa") == 0)
