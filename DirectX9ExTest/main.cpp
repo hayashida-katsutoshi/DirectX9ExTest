@@ -1,4 +1,4 @@
-
+ï»¿
 #define STRICT				// Strict type checking
 #define WINVER        0x501	// Windows XP or later
 #define _WIN32_WINNT  0x501 
@@ -645,6 +645,7 @@ HRESULT InitDXGraphics()
 		BehaviorFlags |= D3DCREATE_ADAPTERGROUP_DEVICE;
 	}
 
+	UINT depthWidth = 0, depthHeight = 0;
 	for( int i = 0; i < g_D3DPP.size(); i++ )
 	{
 		g_D3DPP[i].BackBufferWidth				= g_screens[i].size.cx;
@@ -672,6 +673,9 @@ HRESULT InitDXGraphics()
 		g_D3DPP[i].Flags						= 0;
 //		g_D3DPP[i].PresentationInterval			= D3DPRESENT_INTERVAL_IMMEDIATE;
 		g_D3DPP[i].PresentationInterval			= D3DPRESENT_INTERVAL_ONE;
+
+		depthWidth = max(depthWidth, g_D3DPP[i].BackBufferWidth);
+		depthHeight = max(depthHeight, g_D3DPP[i].BackBufferHeight);
 	}
 
 	D3DDISPLAYMODEEX *dm = SetupDisplayModeEx(&g_D3DPP[0], static_cast<UINT>(g_D3DPP.size()));
@@ -698,6 +702,20 @@ HRESULT InitDXGraphics()
 	{
 		free(dm);
 	}
+
+	// Create Z Buffer and Stencil Buffer manually.
+	IDirect3DSurface9* zStencilSurface = nullptr;
+	g_pD3DDevice->CreateDepthStencilSurface(
+		depthWidth, depthHeight,
+		D3DFMT_D24S8, // 24bit Z + 8bit Stencil
+		D3DMULTISAMPLE_NONE,
+		0,
+		TRUE,
+		&zStencilSurface,
+		nullptr);
+
+	g_pD3DDevice->SetDepthStencilSurface(zStencilSurface);
+
 
 	// Viewport settings.
 	D3DVIEWPORT9 vp;
@@ -743,6 +761,55 @@ HRESULT InitD3DObject(void)
 /*--------------------------------------------
 
 --------------------------------------------*/
+BOOL BeginScene(int index)
+{
+	if (SUCCEEDED(g_pD3DDevice->BeginScene()))
+	{
+		g_pD3DDevice->SetTexture(0, NULL);
+		g_pD3DDevice->SetRenderState(D3DRS_ALPHABLENDENABLE, FALSE);
+		g_pD3DDevice->SetRenderState(D3DRS_ZENABLE, D3DZB_FALSE);
+		g_pD3DDevice->SetRenderState(D3DRS_STENCILENABLE, FALSE);
+		g_pD3DDevice->SetRenderState(D3DRS_COLORWRITEENABLE, ~0);
+		g_pD3DDevice->SetRenderState(D3DRS_COLORWRITEENABLE1, ~0);
+		g_pD3DDevice->SetRenderState(D3DRS_COLORWRITEENABLE2, ~0);
+		g_pD3DDevice->SetRenderState(D3DRS_COLORWRITEENABLE3, ~0);
+		g_pD3DDevice->SetRenderState(D3DRS_CULLMODE, D3DCULL_CCW);
+		g_pD3DDevice->SetRenderState(D3DRS_ALPHATESTENABLE, FALSE);
+		g_pD3DDevice->SetRenderState(D3DRS_LIGHTING, FALSE);
+		g_pD3DDevice->SetRenderState(D3DRS_SPECULARENABLE, FALSE);
+
+		g_pD3DDevice->Clear(
+			0,
+			nullptr,
+			D3DCLEAR_TARGET | D3DCLEAR_STENCIL | D3DCLEAR_ZBUFFER,	// Clear buffer types.
+			GetClearColor(index),									// Clear a render target to this ARGB color.
+			1.0f,													// Clear the depth buffer to this new z value which ranges from 0 to 1.
+			0);														// Clear the stencil buffer to this new value which ranges from 0 to 2â¿-1 (n is the bit depth of the stencil buffer).
+
+		g_pD3DDevice->SetRenderState(D3DRS_SCISSORTESTENABLE, FALSE);
+		g_pD3DDevice->SetSamplerState(0, D3DSAMP_MAGFILTER, D3DTEXF_LINEAR);
+		g_pD3DDevice->SetSamplerState(0, D3DSAMP_MINFILTER, D3DTEXF_LINEAR);
+		g_pD3DDevice->SetSamplerState(0, D3DSAMP_MIPFILTER, D3DTEXF_LINEAR);
+		g_pD3DDevice->SetSamplerState(0, D3DSAMP_ADDRESSU, D3DTADDRESS_CLAMP);
+		g_pD3DDevice->SetSamplerState(0, D3DSAMP_ADDRESSV, D3DTADDRESS_CLAMP);
+		g_pD3DDevice->SetSamplerState(0, D3DSAMP_ADDRESSW, D3DTADDRESS_CLAMP);
+
+		g_pD3DDevice->SetStreamSource(0, NULL, 0, 0);
+
+		g_pD3DDevice->SetRenderState(D3DRS_ALPHABLENDENABLE, TRUE);
+		g_pD3DDevice->SetRenderState(D3DRS_SRCBLEND, D3DBLEND_SRCALPHA);
+		g_pD3DDevice->SetRenderState(D3DRS_DESTBLEND, D3DBLEND_INVSRCALPHA);
+		g_pD3DDevice->SetRenderState(D3DRS_BLENDOP, D3DBLENDOP_ADD);
+		g_pD3DDevice->SetRenderState(D3DRS_ZENABLE, FALSE);
+
+		return TRUE;
+	}
+	return FALSE;
+}
+
+/*--------------------------------------------
+
+--------------------------------------------*/
 HRESULT Render(void)
 {
 	for( int i = 0; i < g_D3DPP.size(); i++ )
@@ -770,11 +837,8 @@ HRESULT Render(void)
 			Exception(L"SetRenderTarget() failed.", hr);
 		}
 
-		// Clear scene.
-		g_pD3DDevice->Clear(0, NULL, D3DCLEAR_TARGET, GetClearColor(i), 1.0f, 0);
-
 		// Draw scene
-		if (SUCCEEDED(g_pD3DDevice->BeginScene()))
+		if (BeginScene(i))
 		{
 			// Draw rotation box
 			int x = g_D3DPP[i].BackBufferWidth / 2;
@@ -1137,19 +1201,19 @@ void RebootTriggered()
 
 void MeasureFramePerSecond()
 {
-	// Ã“I•Ï”‚Å‘O‰ñ‚ÌƒJƒEƒ“ƒ^’l‚ğ•Û
+	// é™çš„å¤‰æ•°ã§å‰å›ã®ã‚«ã‚¦ãƒ³ã‚¿å€¤ã‚’ä¿æŒ
 	static LARGE_INTEGER s_lastCounter = { 0 };
 	static LARGE_INTEGER s_frequency = { 0 };
 	static int newFps = 0;
 	static double mTimeCount = 0;
 
-	// ‰‰ñ‚Ì‚İü”g”‚ğæ“¾
+	// åˆå›ã®ã¿å‘¨æ³¢æ•°ã‚’å–å¾—
 	if (s_frequency.QuadPart == 0) {
 		QueryPerformanceFrequency(&s_frequency);
 		QueryPerformanceCounter(&s_lastCounter);
 	}
 
-	// –ˆƒtƒŒ[ƒ€ŒÄ‚Ño‚·
+	// æ¯ãƒ•ãƒ¬ãƒ¼ãƒ å‘¼ã³å‡ºã™
 	LARGE_INTEGER now;
 	QueryPerformanceCounter(&now);
 	double deltaTime = (double)(now.QuadPart - s_lastCounter.QuadPart) * 1000.0 / s_frequency.QuadPart;
