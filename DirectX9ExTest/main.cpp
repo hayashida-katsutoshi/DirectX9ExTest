@@ -17,6 +17,7 @@
 #include <d3dx9math.h>
 #include <vector>
 #include <mmsystem.h>
+#include "DebugMessageHandler.h"
 
 // Link required libraries.
 #pragma comment( lib, "d3d9.lib" )
@@ -107,6 +108,7 @@ bool CleanupApp(void);
 
 #define Exception(str, hr)	\
 {	\
+	DebugMessageHandler(0) << str << ": hr=" << hr;	\
 	CleanupD3DObject();	\
 	CleanupDXGraphics();	\
 	for (int i = 0; i < g_hWindow.size(); i++)	\
@@ -1204,6 +1206,8 @@ int WINAPI wWinMain(HINSTANCE hInst, HINSTANCE, LPWSTR, int)
 ---------------------------------------------*/
 int RebootProcess()
 {
+	DebugMessageHandler(0) << " > Reboot! Count : " << g_rebootCount + 1;
+
 	char path[MAX_PATH];
 	GetModuleFileNameA(NULL, path, MAX_PATH);
 
