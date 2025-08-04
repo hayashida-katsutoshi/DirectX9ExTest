@@ -66,6 +66,8 @@ int			g_fps = 0;
 
 int			g_objCount = 0;
 
+int			g_need_foreground = 2;
+
 /*-------------------------------------------
 	Global variables(DirectX)
 --------------------------------------------*/
@@ -85,6 +87,11 @@ WCHAR g_szSpriteFile[] = L".\\data\\canvas.dds";	// Location of texture data.
 // TestTexture
 LPDIRECT3DTEXTURE9		g_pBgTexture = NULL;
 WCHAR g_szBgTextureFile[] = L".\\data\\SL_BlindPanel_en_r001.dds";
+
+// TestTexture
+LPDIRECT3DTEXTURE9		g_pTestTexture = NULL;
+WCHAR g_szTestTextureFile[] = L".\\data\\font8x8.tga";
+SIZE g_testTextureSize;
 
 UINT g_backBufferCount = 2;
 
@@ -125,6 +132,10 @@ bool preSync();
 void postSync();
 
 void DrawRotationBox(int x, int y, int w, int h, DWORD color);
+
+void SetAbsoluteForegroundWindow(HWND hWnd);
+
+void DrawTestTexture(int x, int y);
 
 /*-------------------------------------------
 
@@ -738,6 +749,17 @@ HRESULT InitDXGraphics()
 	if (FAILED(hr))
 		Exception(L"[InitDXGraphics] D3DXCreateTextureFromFile(BgTexture) failed.", hr);
 
+	hr = D3DXCreateTextureFromFile(g_pD3DDevice, g_szTestTextureFile, &g_pTestTexture);
+	if (FAILED(hr))
+		Exception(L"[InitDXGraphics] D3DXCreateTextureFromFile(FontTexture) failed.", hr);
+	{
+		D3DSURFACE_DESC desc;
+		if (SUCCEEDED(g_pTestTexture->GetLevelDesc(0, &desc))) {
+			g_testTextureSize.cx = desc.Width;
+			g_testTextureSize.cy = desc.Height;
+		}
+	}
+
 	hr = D3DXCreateSprite(g_pD3DDevice, &g_pD3DXSprite);
 	if (FAILED(hr))
 		Exception(L"[InitDXGraphics] D3DXCreateSprite failed.", hr);
@@ -846,6 +868,11 @@ HRESULT Render(void)
 			int h = (x > y ? x : y) * 2;
 			DrawRotationBox(x, y, 100, h, GetClearColor(i - 1));
 
+			if (i == 0)
+			{
+				DrawTestTexture(1920/2, 1080/2);
+			}
+
 			// Draw sprite
 			if( g_pD3DXSprite )
 			{
@@ -882,6 +909,11 @@ HRESULT Render(void)
 	}
 
 	postSync();
+
+	if (g_need_foreground) {
+		SetAbsoluteForegroundWindow(g_hWindow[0]);
+		g_need_foreground--;
+	}
 
 	return S_OK;
 }
@@ -990,6 +1022,11 @@ LRESULT CALLBACK MainWndProc(HWND hWnd, UINT msg, UINT wParam, LONG lParam)
 
 	switch(msg)
 	{
+	case WM_CREATE:
+		SetFocus(hWnd);
+		SetForegroundWindow(hWnd);
+		break;
+
 	case WM_ACTIVATE:
 		g_bActive = (LOWORD(wParam) != 0);
 		break;
@@ -1359,4 +1396,68 @@ void DrawRotationBox(int x, int y, int w, int h, DWORD color)
 	g_pD3DDevice->SetFVF(BOXFVF);
 	g_pD3DDevice->SetTexture(0, 0);
 	g_pD3DDevice->DrawPrimitiveUP(D3DPT_TRIANGLELIST, 2, v, sizeof(CUSTOM_VERTEX));
+}
+
+/*--------------------------------------------
+
+--------------------------------------------*/
+static void SetAbsoluteForegroundWindow(HWND hWnd)
+{
+	int nTargetID, nForegroundID;
+	DWORD sp_time;
+
+	// フォアグラウンドウィンドウを作成したスレッドのIDを取得
+	nForegroundID = GetWindowThreadProcessId(GetForegroundWindow(), NULL);
+	// 目的のウィンドウを作成したスレッドのIDを取得
+	nTargetID = GetWindowThreadProcessId(hWnd, NULL);
+	// スレッドのインプット状態を結び付ける
+	AttachThreadInput(nTargetID, nForegroundID, TRUE);	// TRUE で結び付け
+	// 現在の設定を sp_time に保存
+	SystemParametersInfo(SPI_GETFOREGROUNDLOCKTIMEOUT, 0, &sp_time, 0);
+	// ウィンドウの切り替え時間を 0ms にする
+	SystemParametersInfo(SPI_SETFOREGROUNDLOCKTIMEOUT, 0, static_cast<LPVOID>(0), 0);
+	// ウィンドウをフォアグラウンドに持ってくる
+	SetForegroundWindow(hWnd);
+	// 設定を元に戻す
+	SystemParametersInfo(SPI_SETFOREGROUNDLOCKTIMEOUT, 0, reinterpret_cast<PVOID>(sp_time), 0);
+	// スレッドのインプット状態を切り離す
+	AttachThreadInput(nTargetID, nForegroundID, FALSE);	// FALSE で切り離し
+}
+
+/*--------------------------------------------
+
+--------------------------------------------*/
+typedef struct
+{
+	float x, y, z, w;
+	DWORD c;
+	float s, t;
+} TESTTEX_VERTEX;
+
+const DWORD TestTexFVF = (D3DFVF_XYZRHW | D3DFVF_DIFFUSE | D3DFVF_TEX1);
+
+void DrawTestTexture(int x, int y)
+{	
+	float fx = (float)x, fy = (float)y, fw = (float)g_testTextureSize.cx, fh = (float)g_testTextureSize.cy;
+	DWORD color = 0xFFFFFFFF;
+	TESTTEX_VERTEX v[4] =
+	{
+		{ 0.0f, 0.0f, 0.0f, 1.0f, color, 0.0f, 0.0f },
+		{ 0.0f, 0.0f, 0.0f, 1.0f, color, 1.0f, 0.0f },
+		{ 0.0f, 0.0f, 0.0f, 1.0f, color, 0.0f, 1.0f },
+		{ 0.0f, 0.0f, 0.0f, 1.0f, color, 1.0f, 1.0f },
+	};
+
+	v[0].x = fx - 0.5f;
+	v[0].y = fy - 0.5f;
+	v[1].x = fx + fw - 0.5f;
+	v[1].y = fy - 0.5f;
+	v[2].x = fx - 0.5f;
+	v[2].y = fy + fh - 0.5f;
+	v[3].x = fx + fw - 0.5f;
+	v[3].y = fy + fh - 0.5f;
+
+	g_pD3DDevice->SetFVF(TestTexFVF);
+	g_pD3DDevice->SetTexture(0, g_pTestTexture);
+	g_pD3DDevice->DrawPrimitiveUP(D3DPT_TRIANGLESTRIP, 2, v, sizeof(TESTTEX_VERTEX));
 }
