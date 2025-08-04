@@ -905,7 +905,7 @@ HRESULT Render(void)
 
 	if (needSync && FAILED(g_pD3DDevice->Present(NULL, NULL, NULL, NULL)))
 	{
-		return S_FALSE;
+		Exception(L"Present() failed.", S_FALSE);
 	}
 
 	postSync();
