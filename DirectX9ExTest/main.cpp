@@ -1216,6 +1216,11 @@ int RebootProcess()
 
 	++g_rebootCount;
 	std::string cmd = GetCommandLineA();
+	size_t pos = cmd.find("--rebootCount");
+	if (pos != std::string::npos) {
+		cmd = cmd.substr(0, pos);
+		cmd.erase(cmd.find_last_not_of(' ') + 1);
+	}
 	std::string extra = " --rebootCount " + std::to_string((_ULonglong)g_rebootCount);
 	std::string newCmd = cmd + extra;
 
