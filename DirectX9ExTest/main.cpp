@@ -67,7 +67,13 @@ int			g_fps = 0;
 
 int			g_objCount = 0;
 
+int			g_resetSec = 0;
+int			g_resetCount = 0;
+int			g_resetFrames = 0;
+
 int			g_need_foreground = 2;
+
+int			g_presentFailedCount = 0;
 
 /*-------------------------------------------
 	Global variables(DirectX)
@@ -77,6 +83,7 @@ int			g_need_foreground = 2;
 LPDIRECT3D9EX			g_pD3D			= NULL; // Direct3D interface.
 LPDIRECT3DDEVICE9EX		g_pD3DDevice	= NULL; // Direct3DDevice interface.
 std::vector <D3DPRESENT_PARAMETERS>	g_D3DPP;	// D3DDevice settings.
+UINT g_depthWidth = 0, g_depthHeight = 0;
 
 bool g_bDeviceLost = false;
 
@@ -251,6 +258,11 @@ void SetCommandLineArgs()
 		{
 			LPWSTR optval = argv[i + 1];
 			g_rebootCount = std::stoi(optval);
+		}
+		else if (opt.compare("--reset") == 0)
+		{
+			LPWSTR optval = argv[i + 1];
+			g_resetSec = std::stoi(optval);
 		}
 	}
 }
@@ -535,6 +547,24 @@ void CreateDisplayInfo()
 /*-------------------------------------------
 
 --------------------------------------------*/
+void CreateDepthStencilBuffer()
+{
+	IDirect3DSurface9* zStencilSurface = nullptr;
+	g_pD3DDevice->CreateDepthStencilSurface(
+		g_depthWidth, g_depthHeight,
+		D3DFMT_D24S8, // 24bit Z + 8bit Stencil
+		D3DMULTISAMPLE_NONE,
+		0,
+		TRUE,
+		&zStencilSurface,
+		nullptr);
+
+	g_pD3DDevice->SetDepthStencilSurface(zStencilSurface);
+}
+
+/*-------------------------------------------
+
+--------------------------------------------*/
 void InitFont(LPDIRECT3DDEVICE9 pDevice)
 {
 	D3DXCreateFont(pDevice, 24, 0, FW_NORMAL, 1, FALSE, DEFAULT_CHARSET,
@@ -566,6 +596,10 @@ void DrawDebugInfo()
 	if (g_rebootSec > 0)
 	{
 		wss << L"Reboot Count : " << g_rebootCount << ENDL
+	}
+	if (g_resetSec > 0)
+	{
+		wss << L"Reset Count : " << g_resetCount << ENDL
 	}
 	for (int i = 0; i < g_screens.size(); i++)
 	{
@@ -658,7 +692,6 @@ HRESULT InitDXGraphics()
 		BehaviorFlags |= D3DCREATE_ADAPTERGROUP_DEVICE;
 	}
 
-	UINT depthWidth = 0, depthHeight = 0;
 	for( int i = 0; i < g_D3DPP.size(); i++ )
 	{
 		g_D3DPP[i].BackBufferWidth				= g_screens[i].size.cx;
@@ -687,8 +720,8 @@ HRESULT InitDXGraphics()
 //		g_D3DPP[i].PresentationInterval			= D3DPRESENT_INTERVAL_IMMEDIATE;
 		g_D3DPP[i].PresentationInterval			= D3DPRESENT_INTERVAL_ONE;
 
-		depthWidth = max(depthWidth, g_D3DPP[i].BackBufferWidth);
-		depthHeight = max(depthHeight, g_D3DPP[i].BackBufferHeight);
+		g_depthWidth = max(g_depthWidth, g_D3DPP[i].BackBufferWidth);
+		g_depthHeight = max(g_depthHeight, g_D3DPP[i].BackBufferHeight);
 	}
 
 	D3DDISPLAYMODEEX *dm = SetupDisplayModeEx(&g_D3DPP[0], static_cast<UINT>(g_D3DPP.size()));
@@ -717,18 +750,7 @@ HRESULT InitDXGraphics()
 	}
 
 	// Create Z Buffer and Stencil Buffer manually.
-	IDirect3DSurface9* zStencilSurface = nullptr;
-	g_pD3DDevice->CreateDepthStencilSurface(
-		depthWidth, depthHeight,
-		D3DFMT_D24S8, // 24bit Z + 8bit Stencil
-		D3DMULTISAMPLE_NONE,
-		0,
-		TRUE,
-		&zStencilSurface,
-		nullptr);
-
-	g_pD3DDevice->SetDepthStencilSurface(zStencilSurface);
-
+	CreateDepthStencilBuffer();
 
 	// Viewport settings.
 	D3DVIEWPORT9 vp;
@@ -907,10 +929,52 @@ HRESULT Render(void)
 
 	if (needSync && FAILED(g_pD3DDevice->Present(NULL, NULL, NULL, NULL)))
 	{
-		Exception(L"Present() failed.", S_FALSE);
-	}
+		switch (g_pD3DDevice->TestCooperativeLevel()) {
+		default:
+			g_presentFailedCount++;
+			break;
+		case D3DERR_DEVICELOST:
+			break;
 
-	postSync();
+		case D3DERR_DEVICENOTRESET:
+			break;
+		}
+
+		if (g_presentFailedCount > 100)
+		{
+			Exception(L"Present() failed over 100 times.", S_FALSE);
+		}
+	}
+	else
+	{
+		postSync();
+
+		if (g_resetSec > 0)
+		{
+			if (g_resetFrames == 60 * g_resetSec)
+			{
+				g_resetFrames = 0;
+				g_resetCount++;
+				D3DDISPLAYMODEEX* dm = SetupDisplayModeEx(&g_D3DPP[0], static_cast<UINT>(g_D3DPP.size()));
+				if (FAILED(g_pD3DDevice->ResetEx(&g_D3DPP[0], dm)))
+				{
+					Exception(L"ResetEx() failed.", S_FALSE);
+				}
+				else
+				{
+					CreateDepthStencilBuffer();
+				}
+				if (dm)
+				{
+					free(dm);
+				}
+			}
+			else
+			{
+				++g_resetFrames;
+			}
+		}
+	}
 
 	if (g_need_foreground) {
 		SetAbsoluteForegroundWindow(g_hWindow[0]);
