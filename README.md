@@ -21,7 +21,8 @@
 |--tertiary|\<width\>x\<height\>|Specify Tertiary Display Resolution<br>default(no option): current resolution|
 |--msaa|none|Enable MSAA<br>default(no option): disabled|
 |--bbcount|0-30(D3DPRESENT_BACK_BUFFERS_MAX_EX)|The value of D3DPRESENT_PARAMETERS::BackBufferCount.<br>default(no option): 2|
-|--reboot|\<time\>|Specify reboot interval(sec.)|
+|--reboot|\<time\>|Specify reboot interval(sec.)<br>e.g. --reboot 5|
+|--reset|\<time\>|Specify ResetEx() call interval(sec.)<br>e.g. --reset 2|
 |--nowait|none|Call D3D9Ex::Present function immediately.|
 
 ## Keyboard Control
